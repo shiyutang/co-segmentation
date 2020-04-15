@@ -1,18 +1,14 @@
 from tqdm import tqdm
-from math import ceil
 from glob import glob
 from PIL import Image
 import PIL
-import random
-import cv2
-from torch.utils.data import Dataset
+from skimage import io
+
 from torchvision import transforms
 from scipy import ndimage
-from torch.utils.data import DataLoader
-from torch.utils.data.sampler import SubsetRandomSampler
 import torch.nn.functional as F
-from torchvision import models
 from itertools import chain
+from collections import Counter
 import logging
 import numpy as np
 from collections import OrderedDict
@@ -21,7 +17,6 @@ import torch
 import os
 import sys
 import zipfile
-import torch.utils.model_zoo as model_zoo
 import torch.nn as nn
 
 try:
@@ -30,6 +25,7 @@ except ImportError:
     from urllib.request import urlretrieve
 __all__ = ['ResNet','resnet152', 'BasicBlock', 'Bottleneck']
 model_urls = { 'resnet152': 'https://hangzh.s3.amazonaws.com/encoding/models/resnet152-0d43d698.zip'}
+
 
 def conv3x3(in_planes, out_planes, stride=1):
     "3x3 convolution with padding"
@@ -218,6 +214,7 @@ class ResNet(nn.Module):
 
         return x
 
+
 def resnet152(pretrained=False, root='./pretrained', **kwargs):
     model = ResNet(Bottleneck, [3, 8, 36, 3], **kwargs)
     if pretrained:
@@ -241,7 +238,16 @@ def load_url(url, model_dir='./pretrained', map_location=None):
         cached_file = os.path.join(model_dir, filename+'.pth')
     return torch.load(cached_file, map_location=map_location)
 
+
 def summary(model, input_shape, batch_size=-1, intputshow=True):
+    '''
+
+    :param model:
+    :param input_shape:
+    :param batch_size:
+    :param intputshow:
+    :return: model infor
+    '''
     def register_hook(module):
         def hook(module, input, output=None):
             class_name = str(module.__class__).split(".")[-1].split("'")[0]
@@ -312,6 +318,7 @@ def summary(model, input_shape, batch_size=-1, intputshow=True):
     model_info += "-----------------------------------------------------------------------\n"
     return model_info
 
+
 class BaseModel(nn.Module):
     def __init__(self):
         super(BaseModel, self).__init__()
@@ -329,9 +336,12 @@ class BaseModel(nn.Module):
         model_parameters = filter(lambda p: p.requires_grad, self.parameters())
         nbr_params = sum([np.prod(p.size()) for p in model_parameters])
         return super(BaseModel, self).__str__() + f'\nNbr of trainable parameters: {nbr_params}'
+
+
 def set_trainable_attr(m,b):
     m.trainable = b
     for p in m.parameters(): p.requires_grad = b
+
 
 def apply_leaf(m, f):
     c = m if isinstance(m, (list, tuple)) else list(m.children())
@@ -341,8 +351,10 @@ def apply_leaf(m, f):
         for l in c:
             apply_leaf(l,f)
 
+
 def set_trainable(l, b):
     apply_leaf(l, lambda m: set_trainable_attr(m,b))
+
 
 def initialize_weights(*models):
     for model in models:
@@ -355,6 +367,7 @@ def initialize_weights(*models):
             elif isinstance(m, nn.Linear):
                 m.weight.data.normal_(0.0, 0.0001)
                 m.bias.data.zero_()
+
 
 class _PSPModule(nn.Module):
     def __init__(self, in_channels, bin_sizes, norm_layer):
@@ -453,14 +466,14 @@ class PSPNet(BaseModel):
         for module in self.modules():
             if isinstance(module, nn.BatchNorm2d): module.eval()
 
+
 def colorize_mask(mask, palette):
     zero_pad = 256 * 3 - len(palette)
     for i in range(zero_pad):
-                    palette.append(0)
+        palette.append(0)
     new_mask = PIL.Image.fromarray(mask.astype(np.uint8)).convert('P')
     new_mask.putpalette(palette)
     return new_mask
-
 
 
 def pad_image(img, target_size):
@@ -490,44 +503,60 @@ def multi_scale_predict(model, image, scales, num_classes, device, flip=False):
     total_predictions /= len(scales)
     return total_predictions
 
-def save_images(image, mask, output_path, image_file, palette):
-    w, h = image.size
+
+def save_images(mask, output_path, image_file, tag, palette):
     if not os.path.exists(output_path):
         os.mkdir(output_path)
     image_file = os.path.basename(image_file).split('.')[0]
     colorized_mask = colorize_mask(mask, palette)
-    colorized_mask.save(os.path.join(output_path, image_file + '.png'))
+    colorized_mask.save(os.path.join(output_path, image_file + tag + '.png'))
 
-def seg(Width,Height,picPath,savePath):
-    segPath = '{}/images'.format(savePath)
-    if not os.path.exists(segPath):
-        os.mkdir(segPath)
 
-    pic_names = [picPath + '/' + i for i in os.listdir(picPath)]
-    for picname in pic_names:
-        name = (picname.split('/')[1]).split('.jpg')[0]
-        img = cv2.imread(picname)
-        img = np.array(img)
-        idx = -1
-        for i in range(0, img.shape[0] // Height, 1):
-            for j in range(0, img.shape[1] // Width, 1):
-                idx += 1
-                SubImg = img[i * Height:(i + 1) * Height,
-                         j * Width:(j + 1) * Width, :]
-                cv2.imwrite(segPath + '/{}_sub_{}.jpg'.format(name,idx), SubImg)
+def SP_fusion(image1, image2):
+    '''
+    :param image1: image of time1
+    :param image2: image of time2
+    :return: the fused superpixel of image1 and image2
+    '''
+    from skimage.segmentation import slic, mark_boundaries
+    import matplotlib.pyplot as plt
 
-def merge(picpath, savepath,row, col, img_size):
-    def lstsort(elem):
-        return int(((elem.split('_sub_')[1]).split('.png')[0]))
-    picname = [picpath + '/' + i for i in os.listdir(picpath)]
-    picname.sort(key=lstsort)
-    res = np.zeros((row, col, 3), dtype=np.uint8)
-    idx = -1
-    for i in range(row // img_size):
-        for j in range(col // img_size):
-            idx += 1
-            res[i * img_size:(i + 1) * img_size, j * img_size:(j + 1) * img_size, :] = cv2.imread(picname[idx]);
-    cv2.imwrite(savepath + '/test.jpg', res)
+    ## SLIC Superpixel and save
+    labels1 = slic(np.array(image1), n_segments=150, compactness=10)
+    labels2 = slic(np.array(image2), n_segments=150, compactness=10)
+    fusion_labels = labels1+labels2
+
+    # test
+    # outf = mark_boundaries(image1, fusion_labels)
+    # out1 = mark_boundaries(image1, labels1)
+    # out2 = mark_boundaries(image2, labels2)
+    # io.imshow(out1)
+    # plt.show()
+    # io.imshow(out2)
+    # plt.show()
+    # io.imshow(outf)
+    # plt.show()
+
+    return fusion_labels
+
+
+def classOfSP(sp, prediction):
+    '''
+    :param sp: super pixel label of a image
+    :param prediction: the probability of segmented result
+    :return: the segmented result as superpixel
+    '''
+    import copy
+    outset = np.unique(sp.flatten())  # the unique labels
+    fuse_prediction = copy.deepcopy(prediction)
+    for i in outset:
+        mostpred, times = Counter(prediction[sp == i]).most_common(1)[0]
+        fuse_prediction[sp == i] = mostpred
+    # test
+    # print('fuse_prediction', fuse_prediction)
+
+    return fuse_prediction
+
 
 def main():
     # Dataset used for training the model
@@ -538,12 +567,36 @@ def main():
     palette = [0, 0, 0, 150, 250, 0, 0, 250, 0, 0, 100, 0, 200,
                0, 0, 255, 255, 255, 0, 0, 200, 0, 150, 250]
 
+    def predict(image):
+        input = normalize(to_tensor(image)).unsqueeze(0)
+        prediction = multi_scale_predict(model, input, scales, num_classes, device)
+        prediction = F.softmax(torch.from_numpy(prediction), dim=0).argmax(0).cpu().numpy()
+
+        return prediction
+
+    def change_detect(sp_fused, prediction1, prediction2, ignore_pixels=200):
+        outset = np.unique(sp_fused.flatten())  # the unique labels
+        change = np.zeros(sp_fused.shape)
+        for i in outset:
+            if len(prediction1[sp_fused == i]) > ignore_pixels:
+                if prediction1[sp_fused == i][0] != prediction2[sp_fused == i][0]:
+                    change[sp_fused == i] = 1
+            # test
+            # if i == 0:
+            #     print('sp_fused == i', sp_fused == i)  # true/False list
+            #     print('prediction1[sp_fused==i]', prediction1[sp_fused == i])  # [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 ]
+            #     print('change', change)
+            #
+        return change
+
     # Model
     model = PSPNet()
-    availble_gpus = list(range(torch.cuda.device_count()))
-    device = torch.device('cuda:0' if len(availble_gpus) > 0 else 'cpu')
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+    else:
+        device = torch.device('cpu')
 
-    checkpoint = torch.load('./best_model.pth')
+    checkpoint = torch.load('./best_model.pth', map_location = device)
     if isinstance(checkpoint, dict) and 'state_dict' in checkpoint.keys():
         checkpoint = checkpoint['state_dict']
     if 'module' in list(checkpoint.keys())[0] and not isinstance(model, torch.nn.DataParallel):
@@ -555,34 +608,47 @@ def main():
 
     if not os.path.exists('outputs'):
         os.makedirs('outputs')
-    extension = 'jpg'
-    image_files = sorted(glob(os.path.join('test', f'*.{extension}')))
-    with torch.no_grad():
-        tbar = tqdm(image_files, ncols=100)
-        for img_file in tbar:
-            image = Image.open(img_file).convert('RGB')
-            input = normalize(to_tensor(image)).unsqueeze(0)
-            prediction = multi_scale_predict(model, input, scales, num_classes, device)
-            prediction = F.softmax(torch.from_numpy(prediction), dim=0).argmax(0).cpu().numpy()
+    img_ext, lbl_ext = 'jpg', 'png'
+    image_files = sorted(glob(os.path.join('test', f'*.{img_ext}')))
+    label_files = sorted(glob(os.path.join('label', f'*.{lbl_ext}')))
 
-            ## get superpixels from image
-            from MGslic import SP_merge
-            sp = SP_merge(image)
+    with torch.no_grad():
+        for index in tqdm(range(len(image_files)//2)):
+            # for each pic in image_files, it will generate classes for each superpixel
+            image1 = Image.open(image_files[2*index]).convert('RGB')
+            image2 = Image.open(image_files[2*index+1]).convert('RGB')
+            label1 = np.array(Image.open(label_files[2*index]).convert('RGB'))
+            label2 = np.array(Image.open(label_files[2*index+1]).convert('RGB'))
+
+            prediction1 = predict(image1)
+            prediction2 = predict(image2)
+
+            # get superpixels from image
+            sp_fused = SP_fusion(image1, image2)
 
             # change the prediction
-            prediction_SP = classOfSP(sp,prediction)  # the prediction after change form
-            save_images(image, prediction, 'outputs', img_file, palette)
-            save_images(image, prediction_SP, 'outputs', img_file, palette)
+            prediction_SP1 = classOfSP(sp_fused, prediction1)  # the prediction for fused_SP = int(classes) array
+            prediction_SP2 = classOfSP(sp_fused, prediction2)
+            change = change_detect(sp_fused, prediction_SP1, prediction_SP2)
+            change_seg, change_gt = np.zeros(sp_fused.shape), np.zeros(sp_fused.shape)
+            change_seg[prediction1 != prediction2] = 1
+            h, w, c = label2.shape
+            mask = (label1 != label2)
+            for i in range(h):
+                for j in range(w):
+                    if (mask[i,j] != [False, False, False]).any():
+                        # print('in')
+                        change_gt[i, j] = 1
+
+            save_images(prediction1, 'outputs', image_files[2*index], 'pred', palette)
+            save_images(prediction_SP1, 'outputs', image_files[2*index], 'pred_afterSP', palette)
+            save_images(prediction2, 'outputs', image_files[2*index+1], 'pred', palette)
+            save_images(prediction_SP2, 'outputs', image_files[2*index+1], 'pred_afterSP', palette)
+            save_images(change, 'outputs', image_files[2*index], 'change', palette)
+            save_images(change_gt, 'outputs', image_files[2*index], 'change_gt', palette)
+            save_images(change_seg, 'outputs', image_files[2*index], 'change_seg', palette)
 
 
 if __name__ == '__main__':
-    from collections import Counter
-    def classOfSP(sp,prediction):
-        outset = np.unique(sp.flatten())
-        for i in outset:
-            mostpred,times = Counter(prediction[sp==i]).most_common(1)[0]
-            prediction[sp==i] = mostpred
-        return prediction
-
     main()
 
