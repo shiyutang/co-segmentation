@@ -1,23 +1,23 @@
+import os
+import sys
+import math
+import copy
+import zipfile
+import logging
+import numpy as np
 from tqdm import tqdm
 from glob import glob
 from PIL import Image
-import PIL
 from skimage import io
-
-from torchvision import transforms
 from scipy import ndimage
-import torch.nn.functional as F
 from itertools import chain
 from collections import Counter
-import logging
-import numpy as np
 from collections import OrderedDict
-import math
+
 import torch
-import os
-import sys
-import zipfile
 import torch.nn as nn
+from torchvision import transforms
+import torch.nn.functional as F
 
 try:
     from urllib import urlretrieve
@@ -471,7 +471,7 @@ def colorize_mask(mask, palette):
     zero_pad = 256 * 3 - len(palette)
     for i in range(zero_pad):
         palette.append(0)
-    new_mask = PIL.Image.fromarray(mask.astype(np.uint8)).convert('P')
+    new_mask = Image.fromarray(mask.astype(np.uint8)).convert('P')
     new_mask.putpalette(palette)
     return new_mask
 
@@ -512,50 +512,132 @@ def save_images(mask, output_path, image_file, tag, palette):
     colorized_mask.save(os.path.join(output_path, image_file + tag + '.png'))
 
 
-def SP_fusion(image1, image2):
+def SP_fusion(image1, image2, n_segments, compactness, merge, merge_regions=50, img_names = ('','')):
     '''
     :param image1: image of time1
     :param image2: image of time2
+    :param n_segments:
+    :param compactness:
     :return: the fused superpixel of image1 and image2
     '''
     from skimage.segmentation import slic, mark_boundaries
     import matplotlib.pyplot as plt
 
     ## SLIC Superpixel and save
-    labels1 = slic(np.array(image1), n_segments=150, compactness=10)
-    labels2 = slic(np.array(image2), n_segments=150, compactness=10)
+    labels1 = slic(np.array(image1), n_segments, compactness)
+    labels2 = slic(np.array(image2), n_segments, compactness)
+
+    result_nomerge = [labels1, labels2]
+    if merge:
+        import skimage.external.tifffile as tifffile
+        from os.path import abspath, dirname
+        Maindirc = abspath(dirname(__file__))
+
+        # set constant for superpixels merge
+        sys.path.insert(0, 'MergeTool')
+
+        MergeTool = 'SuperPixelMerge.exe'
+        SP_label = Maindirc + '/Superpixel.tif'
+        SPMG_label = Maindirc + '/Merge.tif'
+        MG_Criterion = 3  # 0, 1, 2, 3
+        Num_of_Region = merge_regions  # the number of regions after region merging
+        MG_Shape = 0.7
+        MG_Compact = 0.7
+
+        result = []
+        for img_name, labels in zip(img_names, [labels1, labels2]):
+            ## SLIC Superpixel and save
+            labels = labels.astype('int32')
+            tifffile.imsave('Superpixel.tif', labels, photometric='minisblack')
+
+            ## Call the Superpixel Merge tool, format the command line input
+            os.chdir('/data/Project_prep/superpixel-cosegmentation/MergeTool/')
+            cmd_line = '{} {} {} {} {} {} {} {} {}'.format(MergeTool, img_name, SP_label, SPMG_label, \
+                                                           MG_Criterion, Num_of_Region, MG_Shape, ' ', MG_Compact)
+            print('cmd_line', cmd_line)
+            os.system(cmd_line)  # call the Superpixel Merge Tool
+            os.chdir('..')
+
+            ## save merged slic labels
+            MG_labels = tifffile.imread(SPMG_label)
+            result.append(MG_labels)
+
+        labels1, labels2 = result
+
     fusion_labels = labels1+labels2
 
     # test
-    # outf = mark_boundaries(image1, fusion_labels)
+    # out1 = mark_boundaries(image1, result_nomerge[0])
+    # io.imshow(out1)
+    # plt.show()
+    # out = mark_boundaries(image1, result[0])  # this shows previous result stored on PC
+    # io.imshow(out)
+    # plt.show()
+    outf = mark_boundaries(image1, fusion_labels, mode='inner')
     # out1 = mark_boundaries(image1, labels1)
     # out2 = mark_boundaries(image2, labels2)
     # io.imshow(out1)
     # plt.show()
     # io.imshow(out2)
     # plt.show()
-    # io.imshow(outf)
-    # plt.show()
+    io.imshow(outf)
+    plt.show()
 
-    return fusion_labels
+    return fusion_labels, labels1, labels2
 
 
 def classOfSP(sp, prediction):
     '''
-    :param sp: super pixel label of a image
-    :param prediction: the probability of segmented result
-    :return: the segmented result as superpixel
+    :param sp: super pixel label of a image | type: <numpy.ndarray>
+    :param prediction: the probability of segmented result | type: list 200*200
+    :return: the segmented result as superpixel | type: list
     '''
-    import copy
     outset = np.unique(sp.flatten())  # the unique labels
     fuse_prediction = copy.deepcopy(prediction)
     for i in outset:
         mostpred, times = Counter(prediction[sp == i]).most_common(1)[0]
         fuse_prediction[sp == i] = mostpred
+
     # test
     # print('fuse_prediction', fuse_prediction)
 
     return fuse_prediction
+
+
+def label2intarray(label):
+    """
+
+    :param label: the ndarray needs to be transfer into int-element-array
+    :return:
+    """
+    if len(label.shape) == 2:
+        return label
+    palette = list([[0, 0, 0], [150, 250, 0], [0, 250, 0], [0, 100, 0],
+               [200, 0, 0], [255, 255, 255], [0, 0, 200], [0, 150, 250]])
+    h, w, c = label.shape
+    label = label.tolist()
+    label_int = copy.deepcopy(label)
+    for i in range(h):
+        for j in range(w):
+            idx = palette.index(label[i][j])
+            label_int[i][j] = idx
+
+    return np.array(label_int)
+
+
+def accuracy(sp, label):
+    """
+    :param sp:
+    :param label:
+    :return: the accuracy of superpixel segmentation
+    """
+    if len(label.shape) == 3:
+        label = label2intarray(label)
+    sp_pred = classOfSP(sp, label)
+    correct = sp_pred[sp_pred == label]
+    acc = len(correct)/(sp_pred.size)
+
+    return round(acc, 3)
 
 
 def main():
@@ -574,7 +656,7 @@ def main():
 
         return prediction
 
-    def change_detect(sp_fused, prediction1, prediction2, ignore_pixels=200):
+    def change_detect(sp_fused, prediction1, prediction2, ignore_pixels=20):
         outset = np.unique(sp_fused.flatten())  # the unique labels
         change = np.zeros(sp_fused.shape)
         for i in outset:
@@ -586,7 +668,17 @@ def main():
             #     print('sp_fused == i', sp_fused == i)  # true/False list
             #     print('prediction1[sp_fused==i]', prediction1[sp_fused == i])  # [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 ]
             #     print('change', change)
-            #
+
+        return change
+
+    def change_detect_pred_change(pred_change, sp_fused, threshold=0.7, ignore_pixels=20):
+        outset = np.unique(sp_fused.flatten())  # the unique labels
+        change = np.zeros(sp_fused.shape)
+        for i in outset:
+            totalpix_sp = len(prediction1[sp_fused == i])
+            if totalpix_sp > ignore_pixels:
+                if sum(pred_change[sp_fused == i])/totalpix_sp > threshold:
+                    change[sp_fused == i] = 1
         return change
 
     # Model
@@ -623,30 +715,56 @@ def main():
             prediction1 = predict(image1)
             prediction2 = predict(image2)
 
-            # get superpixels from image
-            sp_fused = SP_fusion(image1, image2)
+            merge = False
+            n_segments, compactness, merge_regions = [150], 10, [0]  # 50, 150, 500,
+            if merge:
+                n_segments, merge_regions = [1000, 1500, 2000, 3000], [100, 150, 200]
+            for n_seg in n_segments:
+                for merge_region in merge_regions:
+                    # get fused superpixels from images
+                    sp_fused, sp1, sp2 = SP_fusion(image1, image2, n_seg, compactness, merge, merge_regions=merge_region)
 
-            # change the prediction
-            prediction_SP1 = classOfSP(sp_fused, prediction1)  # the prediction for fused_SP = int(classes) array
-            prediction_SP2 = classOfSP(sp_fused, prediction2)
-            change = change_detect(sp_fused, prediction_SP1, prediction_SP2)
-            change_seg, change_gt = np.zeros(sp_fused.shape), np.zeros(sp_fused.shape)
-            change_seg[prediction1 != prediction2] = 1
-            h, w, c = label2.shape
-            mask = (label1 != label2)
-            for i in range(h):
-                for j in range(w):
-                    if (mask[i,j] != [False, False, False]).any():
-                        # print('in')
-                        change_gt[i, j] = 1
+                    # change the prediction
+                    prediction_SP1 = classOfSP(sp_fused, prediction1)  # the prediction for fused_SP = int(classes) array
+                    prediction_SP2 = classOfSP(sp_fused, prediction2)
 
-            save_images(prediction1, 'outputs', image_files[2*index], 'pred', palette)
-            save_images(prediction_SP1, 'outputs', image_files[2*index], 'pred_afterSP', palette)
-            save_images(prediction2, 'outputs', image_files[2*index+1], 'pred', palette)
-            save_images(prediction_SP2, 'outputs', image_files[2*index+1], 'pred_afterSP', palette)
-            save_images(change, 'outputs', image_files[2*index], 'change', palette)
-            save_images(change_gt, 'outputs', image_files[2*index], 'change_gt', palette)
-            save_images(change_seg, 'outputs', image_files[2*index], 'change_seg', palette)
+                    # label1_fuse_acc = accuracy(sp_fused, label1)
+                    # label1_nofuse_acc = accuracy(sp1, label1)
+                    # label2_fuse_acc = accuracy(sp_fused, label2)
+                    # label2_nofuse_acc = accuracy(sp2, label2)
+                    # pred1_fuse_acc = accuracy(sp_fused, prediction1)
+                    # pred1_nofuse_acc = accuracy(sp2, prediction1)
+                    # pred2_fuse_acc = accuracy(sp_fused, prediction2)
+                    # pred2_nofuse_acc = accuracy(sp2, prediction2)
+                    # save_path = './result.txt'
+                    # with open(save_path, 'a') as f:
+                    #     f.write('Result with n_seg = {}, merge_regions = {} and merge = {}: \n'
+                    #             .format(n_seg, merge_region, merge))
+                    #     f.write('\t label1_fuse_acc: {} \n'.format(label1_fuse_acc))
+                    #     f.write('\t label1_nofuse_acc: {} \n'.format(label1_nofuse_acc))
+                    #     f.write('\t label2_fuse_acc: {} \n'.format(label2_fuse_acc))
+                    #     f.write('\t label2_nofuse_acc: {} \n'.format(label2_nofuse_acc))
+                    #     f.write('\t pred1_fuse_acc: {} \n'.format(pred1_fuse_acc))
+                    #     f.write('\t pred1_nofuse_acc: {} \n'.format(pred1_nofuse_acc))
+                    #     f.write('\t pred2_fuse_acc: {} \n'.format(pred2_fuse_acc))
+                    #     f.write('\t pred2_nofuse_acc: {} \n'.format(pred2_nofuse_acc))
+                    # print('Successfully write to file ~')
+
+                    change = change_detect(sp_fused, prediction_SP1, prediction_SP2)  # the change based co-seg
+                    change_seg, change_gt = np.zeros(sp_fused.shape),np.zeros(sp_fused.shape)
+                    change_seg[prediction1 != prediction2] = 1                        # the change based prediction
+                    change_pred_change = change_detect_pred_change(change_seg, sp_fused)
+                    label1, label2 = label2intarray(label1), label2intarray(label2)
+                    change_gt[label1 != label2] = 1                # the change based labels
+
+                    save_images(prediction1, 'outputs', image_files[2*index], 'pred', palette)
+                    save_images(prediction_SP1, 'outputs', image_files[2*index], 'pred_afterSP', palette)
+                    save_images(prediction2, 'outputs', image_files[2*index+1], 'pred', palette)
+                    save_images(prediction_SP2, 'outputs', image_files[2*index+1], 'pred_afterSP', palette)
+                    save_images(change, 'outputs', image_files[2*index], 'change', palette)
+                    save_images(change_gt, 'outputs', image_files[2*index], 'change_gt', palette)
+                    save_images(change_seg, 'outputs', image_files[2*index], 'change_seg', palette)
+                    save_images(change_pred_change, 'outputs', image_files[2*index], 'change_pred_change', palette)
 
 
 if __name__ == '__main__':
