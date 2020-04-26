@@ -12,6 +12,7 @@ from skimage import io
 from scipy import ndimage
 from itertools import chain
 from collections import Counter
+import matplotlib.pyplot as plt
 from collections import OrderedDict
 
 import torch
@@ -524,7 +525,6 @@ def SP_fusion(image1, image2, n_segments, compactness, merge, merge_regions=50, 
     :return: the fused superpixel of image1 and image2
     """
     from skimage.segmentation import slic, mark_boundaries
-    import matplotlib.pyplot as plt
 
     # SLIC Superpixel and save
     labels1 = slic(np.array(image1), n_segments, compactness)
@@ -568,7 +568,8 @@ def SP_fusion(image1, image2, n_segments, compactness, merge, merge_regions=50, 
 
         labels1, labels2 = result
 
-    fusion_labels = labels1 + labels2
+    fusion_labels_before = labels1 + labels2
+    fusion_labels_after = labels1 + labels2 * 100
 
     # test
     # out1 = mark_boundaries(image1, result_nomerge[0])
@@ -577,17 +578,20 @@ def SP_fusion(image1, image2, n_segments, compactness, merge, merge_regions=50, 
     # out = mark_boundaries(image1, result[0])  # this shows previous result stored on PC
     # io.imshow(out)
     # plt.show()
-    out_f = mark_boundaries(image1, fusion_labels, mode='inner')
     # out1 = mark_boundaries(image1, labels1)
     # out2 = mark_boundaries(image2, labels2)
     # io.imshow(out1)
     # plt.show()
     # io.imshow(out2)
     # plt.show()
-    io.imshow(out_f)
-    plt.show()
+    # out_f = mark_boundaries(image1, fusion_labels_before, mode='inner')
+    # io.imshow(out_f)
+    # plt.show()
+    # out_f = mark_boundaries(image1, fusion_labels_after, mode='inner')
+    # io.imshow(out_f)
+    # plt.show()
 
-    return fusion_labels, labels1, labels2
+    return fusion_labels_before, fusion_labels_after, labels1, labels2
 
 
 def classOfSP(sp, prediction):
@@ -629,7 +633,7 @@ def label2intarray(label):
     return np.array(label_int)
 
 
-def accuracy(sp, label):
+def sp_accuracy(sp, label):
     """
     :param sp:
     :param label:
@@ -642,6 +646,32 @@ def accuracy(sp, label):
     acc = len(correct) / sp_pred.size
 
     return round(acc, 3)
+
+
+def record_acc(sp_fused, label1, label2, sp1, sp2, prediction1,
+               prediction2, n_seg, merge_region, merge):
+    label1_fuse_acc = sp_accuracy(sp_fused, label1)
+    label1_nofuse_acc = sp_accuracy(sp1, label1)
+    label2_fuse_acc = sp_accuracy(sp_fused, label2)
+    label2_nofuse_acc = sp_accuracy(sp2, label2)
+    pred1_fuse_acc = sp_accuracy(sp_fused, prediction1)
+    pred1_nofuse_acc = sp_accuracy(sp2, prediction1)
+    pred2_fuse_acc = sp_accuracy(sp_fused, prediction2)
+    pred2_nofuse_acc = sp_accuracy(sp2, prediction2)
+
+    save_path = './result.txt'
+    with open(save_path, 'a') as f:
+        f.write('Result with n_seg = {}, merge_regions = {} and merge = {}: \n'
+                .format(n_seg, merge_region, merge))
+        f.write('\t label1_fuse_acc: {} \n'.format(label1_fuse_acc))
+        f.write('\t label1_nofuse_acc: {} \n'.format(label1_nofuse_acc))
+        f.write('\t label2_fuse_acc: {} \n'.format(label2_fuse_acc))
+        f.write('\t label2_nofuse_acc: {} \n'.format(label2_nofuse_acc))
+        f.write('\t pred1_fuse_acc: {} \n'.format(pred1_fuse_acc))
+        f.write('\t pred1_nofuse_acc: {} \n'.format(pred1_nofuse_acc))
+        f.write('\t pred2_fuse_acc: {} \n'.format(pred2_fuse_acc))
+        f.write('\t pred2_nofuse_acc: {} \n'.format(pred2_nofuse_acc))
+    print('Successfully write to file ~')
 
 
 def main():
@@ -708,6 +738,7 @@ def main():
     model.to(device)
     model.eval()
 
+    # data
     if not os.path.exists('outputs'):
         os.makedirs('outputs')
     img_ext, lbl_ext = 'jpg', 'png'
@@ -721,52 +752,39 @@ def main():
             image2 = Image.open(image_files[2 * index + 1]).convert('RGB')
             label1 = np.array(Image.open(label_files[2 * index]).convert('RGB'))
             label2 = np.array(Image.open(label_files[2 * index + 1]).convert('RGB'))
+            print(image_files[2 * index], image_files[2 * index+1],
+                  label_files[2 * index], label_files[2 * index+1])
 
             prediction1 = predict(image1)
             prediction2 = predict(image2)
 
             merge = False
-            n_segments, compactness, merge_regions = [1500, 2000], 10, [0]  # 50, 150, 500,
+            n_segments, compactness, merge_regions = [500], 10, [0]  # [50, 150, 500, 1000, 1500, 2000]
             if merge:
                 n_segments, merge_regions = [1000, 1500, 2000, 3000], [100, 150, 200]
             for n_seg in n_segments:
                 for merge_region in merge_regions:
                     # get fused superpixels from images
-                    sp_fused, sp1, sp2 = SP_fusion(image1, image2, n_seg, compactness, merge,
-                                                   merge_regions=merge_region)
+                    sp_fusedbefore, sp_fused, sp1, sp2 = SP_fusion(image1, image2, n_seg, compactness, merge,
+                                                                   merge_regions=merge_region)
 
                     # change the prediction
                     prediction_SP1 = classOfSP(sp_fused, prediction1)  # the prediction for fused_SP = int(classes)
                     prediction_SP2 = classOfSP(sp_fused, prediction2)
 
-                    label1_fuse_acc = accuracy(sp_fused, label1)
-                    label1_nofuse_acc = accuracy(sp1, label1)
-                    label2_fuse_acc = accuracy(sp_fused, label2)
-                    label2_nofuse_acc = accuracy(sp2, label2)
-                    pred1_fuse_acc = accuracy(sp_fused, prediction1)
-                    pred1_nofuse_acc = accuracy(sp2, prediction1)
-                    pred2_fuse_acc = accuracy(sp_fused, prediction2)
-                    pred2_nofuse_acc = accuracy(sp2, prediction2)
-                    save_path = './result.txt'
-                    with open(save_path, 'a') as f:
-                        f.write('Result with n_seg = {}, merge_regions = {} and merge = {}: \n'
-                                .format(n_seg, merge_region, merge))
-                        f.write('\t label1_fuse_acc: {} \n'.format(label1_fuse_acc))
-                        f.write('\t label1_nofuse_acc: {} \n'.format(label1_nofuse_acc))
-                        f.write('\t label2_fuse_acc: {} \n'.format(label2_fuse_acc))
-                        f.write('\t label2_nofuse_acc: {} \n'.format(label2_nofuse_acc))
-                        f.write('\t pred1_fuse_acc: {} \n'.format(pred1_fuse_acc))
-                        f.write('\t pred1_nofuse_acc: {} \n'.format(pred1_nofuse_acc))
-                        f.write('\t pred2_fuse_acc: {} \n'.format(pred2_fuse_acc))
-                        f.write('\t pred2_nofuse_acc: {} \n'.format(pred2_nofuse_acc))
-                    print('Successfully write to file ~')
-
                     change = change_detect(sp_fused, prediction_SP1, prediction_SP2)  # the change based co-seg
+
                     change_seg, change_gt = np.zeros(sp_fused.shape), np.zeros(sp_fused.shape)
                     change_seg[prediction1 != prediction2] = 1  # the change based prediction
-                    change_pred_change = change_detect_pred_change(change_seg, sp_fused)
+
                     label1, label2 = label2intarray(label1), label2intarray(label2)
                     change_gt[label1 != label2] = 1  # the change based labels
+
+                    change_pred_change = change_detect_pred_change(change_seg, sp_fused)
+
+                    correct = change_pred_change[change_gt == 1]
+                    acc = sum(correct) / len(correct)
+                    print('acc of change detection on image {} is {}'.format(image_files[2 * index], acc))
 
                     save_images(prediction1, 'outputs', image_files[2 * index], 'pred', palette)
                     save_images(prediction_SP1, 'outputs', image_files[2 * index], 'pred_afterSP', palette)
@@ -776,6 +794,10 @@ def main():
                     save_images(change_gt, 'outputs', image_files[2 * index], 'change_gt', palette)
                     save_images(change_seg, 'outputs', image_files[2 * index], 'change_seg', palette)
                     save_images(change_pred_change, 'outputs', image_files[2 * index], 'change_pred_change', palette)
+
+                    # record super pixel accuracy
+                    # record_acc(sp_fused, label1, label2, sp1, sp2, prediction1,
+                    #            prediction2, n_seg, merge_region, merge)
 
 
 if __name__ == '__main__':
