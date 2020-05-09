@@ -24,9 +24,9 @@ img = io.imread(os.path.join('test','1.jpg'))
 out = mark_boundaries(img, sp)
 
 ## test
-print('out',out.max(),out.min(),sp)
+print('out', out.max(), out.min(),sp)
 outset = np.unique(sp.flatten())
-print('set',outset)
+print('set', outset)
 
 io.imshow(out)
 plt.show()

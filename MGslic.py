@@ -8,11 +8,19 @@ import numpy as np
 from skimage import io
 import matplotlib.pyplot as plt
 
-def SP_merge(image):
+
+def SP_fusion(image1, image2):
+    '''
+    :param image1: image of time1
+    :param image2: image of time2
+    :return: the fused superpixel of image1 and image2
+    '''
     ## SLIC Superpixel and save
-    img = np.array(image)
-    labels = slic(img, n_segments=500, compactness=10)
-    return labels
+    labels1 = slic(np.array(image1), n_segments=500, compactness=10)
+    labels2 = slic(np.array(image2), n_segments=500, compactness=10)
+    fusion_labels = labels1+labels2
+
+    return fusion_labels
 
 
 if __name__ == '__main__':
@@ -48,8 +56,8 @@ if __name__ == '__main__':
         ## Call the Superpixel Merge tool, format the command line input
         os.chdir('./MergeTool/')
         cmd_line = '{} {} {} {} {} {} {} {} {}'.\
-            format(MergeTool,img_name,SP_label,SPMG_label,\
-                MG_Criterion,Num_of_Region,MG_Shape,' ',MG_Compact)
+            format(MergeTool, img_name, SP_label, SPMG_label, \
+                MG_Criterion, Num_of_Region, MG_Shape, ' ', MG_Compact)
         os.system(cmd_line)  # call the Superpixel Merge Tool
         os.chdir('..')
 
@@ -59,9 +67,6 @@ if __name__ == '__main__':
         io.imshow(out)
         plt.show()
 
-
-        print(MG_labels)
-
-        # with open('{}/MGslicLabels_{}.pkl'.format(savePath, i), 'wb') as file:
-        #     pickle.dump(MG_labels, file)
-        # print('saved file {}/MGslicLabels_{}.pkl'.format(savePath, i))
+        with open('{}/MGslicLabels_{}.pkl'.format(savePath, i), 'wb') as file:
+            pickle.dump(MG_labels, file)
+        print('saved file {}/MGslicLabels_{}.pkl'.format(savePath, i))

@@ -1,13 +1,13 @@
-from skimage.segmentation import slic, find_boundaries,mark_boundaries
+from skimage.segmentation import slic, mark_boundaries
 import skimage.external.tifffile as tifffile
-import pickle
 import os
 import sys
-from os.path import abspath,dirname
+from os.path import abspath, dirname
 from skimage import io
+from PIL import Image
 import matplotlib.pyplot as plt
 
-Maindirc= abspath(dirname(__file__))
+Maindirc = abspath(dirname(__file__))
 print('maindirc',Maindirc)
 # 原图路径
 picPath = 'test'
@@ -26,18 +26,20 @@ MG_Compact = 0.7
 
 
 pics = [picPath + '/' + i for i in os.listdir(picPath)]
-for i,img_name in enumerate(pics):
-    img = io.imread(img_name)
+for i, img_name in enumerate(pics):
+    # img = io.imread(img_name)
+    img = Image.open(img_name).convert('RGB')
 
     ## SLIC Superpixel and save
     labels = slic(img, n_segments=500, compactness=10)
     labels = labels.astype('int32')
     out = mark_boundaries(img, labels)
+    io.imshow(out)
+    plt.show()
     tifffile.imsave('Superpixel.tif', labels, photometric='minisblack')
 
 
     ## Call the Superpixel Merge tool, format the command line input
-    # os.chdir(r'C:\Users\96251\Desktop\superpixel\MergeTool')
     os.chdir('./MergeTool/')
     cmd_line = '{} {} {} {} {} {} {} {} {}'.format(MergeTool,img_name,SP_label,SPMG_label,\
                                                    MG_Criterion,Num_of_Region,MG_Shape,' ',MG_Compact)
@@ -49,10 +51,3 @@ for i,img_name in enumerate(pics):
     out = mark_boundaries(img, MG_labels)
     io.imshow(out)
     plt.show()
-
-
-    print(MG_labels)
-
-    # with open('{}/MGslicLabels_{}.pkl'.format(savePath, i), 'wb') as file:
-    #     pickle.dump(MG_labels, file)
-    # print('saved file {}/MGslicLabels_{}.pkl'.format(savePath, i))
