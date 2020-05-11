@@ -475,8 +475,14 @@ class ChangeDetection:
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize([0.45734706, 0.43338275, 0.40058118], [0.23965294, 0.23532275, 0.2398498])
         self.num_classes = 8
-        self.palette = [0, 0, 0, 150, 250, 0, 0, 250, 0, 0, 100, 0, 200,
-                        0, 0, 255, 255, 255, 0, 0, 200, 0, 150, 250]
+        self.palette = [0, 0, 0,
+                        150, 250, 0,
+                        0, 250, 0,
+                        0, 100, 0,
+                        200, 0, 0,
+                        255, 255, 255,
+                        0, 0, 200,
+                        0, 150, 250]
 
         # device
         if torch.cuda.is_available():
@@ -524,6 +530,7 @@ class ChangeDetection:
                 #       self.label_files[2 * index], self.label_files[2 * index + 1])
 
                 prediction1 = self.predict(image1)
+                print('set(prediction1)', np.unique(prediction1))
                 prediction2 = self.predict(image2)
 
                 for n_seg in self.n_segments:
@@ -543,14 +550,19 @@ class ChangeDetection:
                         # the change based on prediction
                         change_seg, change_gt = np.zeros(sp_fused.shape), np.zeros(sp_fused.shape)
                         change_seg[prediction1 != prediction2] = 1
+                        change_seg[prediction1 == 0] = 0
+                        change_seg[prediction2 == 0] = 0
 
                         # the change based on labels
                         label1, label2 = self.label2intarray(label1), self.label2intarray(label2)
                         change_gt[label1 != label2] = 1
+                        change_gt[label1 == 0] = 0
+                        change_gt[label2 == 0] = 0
 
                         # the change based on fused SP filter pred change
                         change_pred_change = self.change_detect_pred_change(sp_fused, change_seg, prediction1)
 
+                        # metric
                         correct = change_pred_change[change_gt == 1]
                         recall = sum(correct) / len(correct)
                         precision = sum(correct) / sum(change_pred_change[change_pred_change == 1])
@@ -594,7 +606,8 @@ class ChangeDetection:
         change_pred = np.zeros(fused_sp.shape)
         for i in outset:
             if len(prediction_SP1[fused_sp == i]) > ignore_pixels:
-                if prediction_SP1[fused_sp == i][0] != prediction_SP2[fused_sp == i][0]:
+                if prediction_SP1[fused_sp == i][0] != prediction_SP2[fused_sp == i][0] and \
+                        prediction_SP2[fused_sp == i][0] != 0 and prediction_SP1[fused_sp == i][0] != 0:
                     change_pred[fused_sp == i] = 1
             # test if i == 0: print('sp_fused == i', sp_fused == i)  # true/False
             # list print('prediction1[sp_fused==i]', prediction1[sp_fused == i])

@@ -8,15 +8,19 @@ import numpy as np
 import os
 
 # read_path = 'D:\school\change detection\data\change_chengdu_part\mask'
-read_path = 'D:\school\change detection\superpixel-cosegmentatin\xionganData\001_2844853_2206087_1R_2R'
+from skimage.external.tifffile import tifffile
+
+read_path = r'D:\school\change detection\superpixel-cosegmentatin\xionganData'
 image_list = [f for f in Path(read_path).glob('*.tif')]
+print('image_list', image_list)
 
 height, width = 800, 800
 save_ext = '.jpg'
 
 for image_name in image_list:
-    im = Image.open(image_name)
+    # im = Image.open(image_name)
     # im.show()
+    im = tifffile.imread(image_name)
     im = np.array(im)
     im_height, im_width, channel = im.shape
     im_name = str(image_name).split('\\')[-1]
