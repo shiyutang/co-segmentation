@@ -18,14 +18,14 @@ palette_save = [0, 0, 0,
                 0, 0, 200,
                 0, 150, 250]
 
-mappalette = {(0, 1, 0): 0, (0, 0, 0): 0,
-              (191, 255, 0): 1, (192, 255, 0): 1, (194, 255, 2): 1, (189, 255, 0): 1, (193, 255, 0): 1, (197, 249, 0): 1, (216, 255, 18): 1, (184, 227, 0): 1,
-              (0, 255, 0): 2,
-              (0, 102, 0): 3, (0, 86, 0): 1,
-              (255, 0, 0): 4,
+mappalette = {(0, 1, 0): 0, (0, 0, 0): 0, (0, 0, 5): 0,
+              (191, 255, 0): 1, (192, 255, 0): 1, (150, 250, 0): 1,
+              (0, 255, 0): 2, (0, 250, 0): 2,
+              (0, 102, 0): 3, (0, 86, 0): 1, (0, 153, 0): 1, (0, 100, 0): 1,
+              (255, 0, 0): 4, (200, 0, 0): 4,
               (255, 255, 255): 5, (255, 255, 0): 5,
-              (0, 0, 204): 6, (0, 0, 255): 6,
-              (0, 86, 255): 7, (0, 153, 255): 7}
+              (0, 0, 204): 6, (0, 0, 255): 6, (0, 0, 200): 6, (0, 2, 255): 6,
+              (0, 86, 255): 7, (0, 153, 255): 7, (0, 150, 250): 7}
 
 palette = list([[0, 0, 0], [150, 250, 0], [0, 250, 0], [0, 100, 0],
                 [200, 0, 0], [255, 255, 255], [0, 0, 200], [0, 150, 250]])
@@ -93,13 +93,14 @@ def colorize_mask(mask, palette):
     return new_mask
 
 
-def save_images(mask, output_path, image_file, tag):
-    if not os.path.exists(output_path):
-        os.mkdir(output_path)
-    image_file = os.path.basename(image_file).split('.')[0]
+def save_images(mask, output_path=None, image_file=None, tag=None, savePath=None):
     colorized_mask = colorize_mask(mask, palette_save)
-    save_path = os.path.join(output_path, image_file + tag + '.png')
-    colorized_mask.save(save_path)
+    if savePath is None:
+        if not os.path.exists(output_path):
+            os.mkdir(output_path)
+        image_file = os.path.basename(image_file).split('.')[0]
+        savePath = os.path.join(output_path, image_file + tag + '.png')
+    colorized_mask.save(savePath)
 
 
 read_path = Path(r'D:\school\change detection\co-segmentation\xionganData')
@@ -110,8 +111,8 @@ height, width = 800, 800
 
 for cat_dir in dir_list:
     cat_dir = Path(cat_dir)
-    # if '001' in str(cat_dir):
-    #     continue
+    if '007' not in str(cat_dir):
+        continue
 
     image_list = [f for f in cat_dir.glob('*[^segimg]')]
     print(len(image_list))
@@ -142,5 +143,10 @@ for cat_dir in dir_list:
     print('labellist', labellist)
 
     # test()
-    for i in range(len(labellist) // 2):
-        change_gt(index=2 * i, save_dir=savedir)
+    # for i in range(len(labellist) // 2):
+    #     change_gt(index=2 * i, save_dir=savedir)
+
+    for labelname in labellist:
+        label = np.array(Image.open(labelname).convert('RGB'))
+        label = label2intarray(label, trans_palette=mappalette)
+        save_images(label, savePath=labelname)
