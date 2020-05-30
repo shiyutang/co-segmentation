@@ -1,6 +1,7 @@
 import copy
 import logging
 import os
+import re
 import sys
 import zipfile
 from collections import Counter
@@ -9,12 +10,15 @@ from glob import glob
 from itertools import chain
 
 import math
+from pathlib import Path
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from PIL import Image
 from scipy import ndimage
+from tifffile import tifffile
 from torchvision import transforms
 from tqdm import tqdm
 
@@ -469,12 +473,14 @@ def colorize_mask(mask, palette):
     return new_mask
 
 
+# noinspection PyPep8Naming
 class ChangeDetection:
     def __init__(self):
         self.scales = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize([0.45734706, 0.43338275, 0.40058118], [0.23965294, 0.23532275, 0.2398498])
         self.num_classes = 8
+        self.exp = 'Xiongan_newlabels_0530'
         self.palette = [0, 0, 0,
                         150, 250, 0,
                         0, 250, 0,
@@ -504,41 +510,72 @@ class ChangeDetection:
         self.model.eval()
 
         # data
-        if not os.path.exists('outputs'):
-            os.makedirs('outputs')
-        img_ext, lbl_ext = 'jpg', 'png'
-        self.image_files = sorted(glob(os.path.join('test', f'*.{img_ext}')))
-        self.label_files = sorted(glob(os.path.join('label', f'*.{lbl_ext}')))
+        self.out_path = 'outputs/xiongan_change'
+        if not os.path.exists(self.out_path):
+            os.makedirs(self.out_path)
+            
+        self.datapath = './origin_img/xiongan'
+        if 'chengdu' in self.datapath:
+            img_ext, lbl_ext = 'jpg', 'png'
+            self.image_files = sorted(glob(os.path.join('./origin_img/chengdu', f'*.{img_ext}')))
+            self.label_files = sorted(glob(os.path.join('./label/chengdu', f'*.{lbl_ext}')))
+            self.num_pairs = len(self.image_files) // 2
+        else:
+            self.num_pairs = len(glob(os.path.join(self.datapath, '*')))
+            self.image_dirs = sorted(glob(os.path.join(self.datapath, '*')))
 
         # settings
         self.merge = False
-        self.n_segments, self.compactness, self.merge_regions = [500], 10, [0]  # [50, 150, 500, 1000, 1500, 2000]
+        self.n_segments, self.compactness, self.merge_regions = [200, 500, 1000, 1500, 2000], 10, [0]  # [50, 150, 500, 1000, 1500, 2000]
         if self.merge:
             self.n_segments, self.merge_regions = [1000, 1500, 2000, 3000], [100, 150, 200]
 
     def detect(self):
         # testing
         with torch.no_grad():
-            for index in tqdm(range(len(self.image_files) // 2)):
+            for index in range(0, self.num_pairs):
+                # if index<23:
+                #     continue
                 # for each pic in image_files, it will generate classes for each superpixel
-                image1 = Image.open(self.image_files[2 * index]).convert('RGB')
-                image2 = Image.open(self.image_files[2 * index + 1]).convert('RGB')
-                label1 = np.array(Image.open(self.label_files[2 * index]).convert('RGB'))
-                label2 = np.array(Image.open(self.label_files[2 * index + 1]).convert('RGB'))
+                if 'chengdu' in self.datapath:
+                    image_paths = self.image_files[2 * index:2 * index + 2]
+
+                    # the change based on labels
+                    change_gt = np.zeros(sp_fused.shape)
+                    label1 = np.array(Image.open(self.label_files[2 * index]).convert('RGB'))
+                    label2 = np.array(Image.open(self.label_files[2 * index + 1]).convert('RGB'))
+                    label1, label2 = self.label2intarray(label1), self.label2intarray(label2)
+                    change_gt[label1 != label2] = 1
+                    change_gt[label1 == 0] = 0
+                    change_gt[label2 == 0] = 0
+                else:
+                    image_paths = sorted(glob(os.path.join(self.image_dirs[index], '*.jpg')))
+                    
+                    # the change based on labels
+                    mask_path = glob(os.path.join(self.image_dirs[index], 'mask/*.tif'))[0]
+                    change_gt = tifffile.imread(mask_path)
+                    change_gt = self.label2intarray(change_gt)
+
+                image1 = Image.open(image_paths[0]).convert('RGB')
+                image2 = Image.open(image_paths[1]).convert('RGB')
                 # test
-                # print(self.image_files[2 * index], self.image_files[2 * index + 1],
+                # print(image_paths[0], image_paths[1],
                 #       self.label_files[2 * index], self.label_files[2 * index + 1])
 
                 prediction1 = self.predict(image1)
-                print('set(prediction1)', np.unique(prediction1))
+                # print('set(prediction1)', np.unique(prediction1))
                 prediction2 = self.predict(image2)
 
                 for n_seg in self.n_segments:
                     for merge_region in self.merge_regions:
                         # get fused superpixels from images
-                        sp_fusedbefore, sp_fused, sp1, sp2 = \
+                        _, sp_fused, sp1, sp2 = \
                             self.SP_fusion(image1, image2, n_seg, self.compactness,
                                            self.merge, merge_regions=merge_region)
+
+                        # record super pixel accuracy
+                        self.record_acc(sp_fused, sp1, sp2, prediction1, prediction2, n_seg, merge_region)
+                        continue
 
                         # change the prediction
                         prediction_SP1 = self.classOfSP(sp_fused, prediction1)
@@ -548,43 +585,41 @@ class ChangeDetection:
                         change_fusedSP = self.change_detect(prediction_SP1, prediction_SP2, sp_fused)
 
                         # the change based on prediction
-                        change_seg, change_gt = np.zeros(sp_fused.shape), np.zeros(sp_fused.shape)
+                        change_seg = np.zeros(sp_fused.shape)
                         change_seg[prediction1 != prediction2] = 1
                         change_seg[prediction1 == 0] = 0
                         change_seg[prediction2 == 0] = 0
-
-                        # the change based on labels
-                        label1, label2 = self.label2intarray(label1), self.label2intarray(label2)
-                        change_gt[label1 != label2] = 1
-                        change_gt[label1 == 0] = 0
-                        change_gt[label2 == 0] = 0
 
                         # the change based on fused SP filter pred change
                         change_pred_change = self.change_detect_pred_change(sp_fused, change_seg, prediction1)
 
                         # metric
                         correct = change_pred_change[change_gt == 1]
+                        if len(correct) == 0:
+                            print('***************************')
+                            print('The incorrect data path is ', image_paths[0])
+                            continue
                         recall = sum(correct) / len(correct)
                         precision = sum(correct) / sum(change_pred_change[change_pred_change == 1])
                         f1_score = 2*((precision*recall)/(precision+recall))
 
                         print('image {}, Recall: {}, precision: {}, f1score: {}'.format(
-                            self.image_files[2 * index], recall, precision, f1_score))
+                            image_paths[0], recall, precision, f1_score))
 
                         # save prediction result on images
-                        self.save_images(prediction1, 'outputs', self.image_files[2 * index], 'pred')
-                        self.save_images(prediction_SP1, 'outputs', self.image_files[2 * index], 'pred_afterSP')
-                        self.save_images(prediction2, 'outputs', self.image_files[2 * index + 1], 'pred')
-                        self.save_images(prediction_SP2, 'outputs', self.image_files[2 * index + 1], 'pred_afterSP')
-                        self.save_images(change_fusedSP, 'outputs', self.image_files[2 * index], 'change')
-                        self.save_images(change_gt, 'outputs', self.image_files[2 * index], 'change_gt')
-                        self.save_images(change_seg, 'outputs', self.image_files[2 * index], 'change_seg')
-                        self.save_images(change_pred_change, 'outputs', self.image_files[2 * index],
-                                         'change_pred_change')
+                        match_idx = Path(image_paths[0])._parts[-2]
+                        self.out_path_tmp = os.path.join(self.out_path, match_idx)
 
-                        # record super pixel accuracy
-                        # record_acc(sp_fused, label1, label2, sp1, sp2, prediction1,
-                        #            prediction2, n_seg, merge_region, merge)
+                        self.save_images(prediction1, self.out_path_tmp, image_paths[0], 'pred')
+                        self.save_images(prediction_SP1, self.out_path_tmp, image_paths[0], 'pred_afterSP')
+                        self.save_images(prediction2, self.out_path_tmp, image_paths[1], 'pred')
+                        self.save_images(prediction_SP2, self.out_path_tmp, image_paths[1], 'pred_afterSP')
+                        self.save_images(change_fusedSP, self.out_path_tmp, image_paths[0], 'change_SP')
+                        self.save_images(change_gt, self.out_path_tmp, image_paths[0], 'change_gt')
+                        self.save_images(change_seg, self.out_path_tmp, image_paths[0], 'change_seg')
+                        self.save_images(change_pred_change, self.out_path_tmp, image_paths[0], 'change_pred_SP')
+
+
 
     def predict(self, image):
         inputs = self.normalize(self.to_tensor(image)).unsqueeze(0)
@@ -600,7 +635,7 @@ class ChangeDetection:
         :param prediction_SP1: semantic prediction based on 1st image
         :param prediction_SP2: semantic prediction based on 2st image
         :param ignore_pixels: super pixels contain more pixel than this one will be considered
-        :return:
+        :return: change based on fused_superpixel prediction
         """
         outset = np.unique(fused_sp.flatten())  # the unique labels
         change_pred = np.zeros(fused_sp.shape)
@@ -617,7 +652,7 @@ class ChangeDetection:
         return change_pred
 
     @staticmethod
-    def change_detect_pred_change(sp_fused, change_seg, prediction1, threshold=0.7, ignore_pixels=20):
+    def change_detect_pred_change(sp_fused, change_seg, prediction1, threshold=0.5, ignore_pixels=20):
         outset = np.unique(sp_fused.flatten())  # the unique labels
         change_based_pred = np.zeros(sp_fused.shape)
         for i in outset:
@@ -648,6 +683,14 @@ class ChangeDetection:
         return total_predictions
 
     def save_images(self, mask, output_path, image_file, tag):
+        """
+        save the mask(numpy array) of value [0, classes-1] into os.path.join(output_path, image_file + tag + '.png')
+        :param mask: the numpy array that you need to save
+        :param output_path:
+        :param image_file: derived from which file
+        :param tag: the tag of the image
+        :return: nothing, the saved color mask in output path
+        """
         if not os.path.exists(output_path):
             os.mkdir(output_path)
         image_file = os.path.basename(image_file).split('.')[0]
@@ -759,7 +802,7 @@ class ChangeDetection:
         """
 
         :param label: the ndarray needs to be transfer into int-element-array
-        :return:
+        :return: the
         """
         if len(label.shape) == 2:
             return label
@@ -770,7 +813,10 @@ class ChangeDetection:
         label_int = copy.deepcopy(label)
         for i in range(h):
             for j in range(w):
-                idx = palette.index(label[i][j])
+                try:
+                    idx = palette.index(label[i][j])
+                except ValueError:
+                    idx = 1
                 label_int[i][j] = idx
 
         return np.array(label_int)
@@ -789,25 +835,28 @@ class ChangeDetection:
 
         return round(acc, 3)
 
-    def record_acc(self, sp_fused, label1, label2, sp1, sp2, prediction1,
-                   prediction2, n_seg, merge_region, merge):
-        label1_fuse_acc = self.sp_accuracy(sp_fused, label1)
-        label1_nofuse_acc = self.sp_accuracy(sp1, label1)
-        label2_fuse_acc = self.sp_accuracy(sp_fused, label2)
-        label2_nofuse_acc = self.sp_accuracy(sp2, label2)
+    def record_acc(self, sp_fused,  sp1, sp2, prediction1,
+                   prediction2, n_seg, merge_region, label1=None, label2=None):
+        # label1_fuse_acc = self.sp_accuracy(sp_fused, label1)
+        # label1_nofuse_acc = self.sp_accuracy(sp1, label1)
+        # label2_fuse_acc = self.sp_accuracy(sp_fused, label2)
+        # label2_nofuse_acc = self.sp_accuracy(sp2, label2)
         pred1_fuse_acc = self.sp_accuracy(sp_fused, prediction1)
-        pred1_nofuse_acc = self.sp_accuracy(sp2, prediction1)
+        pred1_nofuse_acc = self.sp_accuracy(sp1, prediction1)
         pred2_fuse_acc = self.sp_accuracy(sp_fused, prediction2)
         pred2_nofuse_acc = self.sp_accuracy(sp2, prediction2)
 
         save_path = './result.txt'
         with open(save_path, 'a') as f:
+            f.write('########################################')
+            f.write('Experiment:{}'.format(self.exp))
+
             f.write('Result with n_seg = {}, merge_regions = {} and merge = {}: \n'
-                    .format(n_seg, merge_region, merge))
-            f.write('\t label1_fuse_acc: {} \n'.format(label1_fuse_acc))
-            f.write('\t label1_nofuse_acc: {} \n'.format(label1_nofuse_acc))
-            f.write('\t label2_fuse_acc: {} \n'.format(label2_fuse_acc))
-            f.write('\t label2_nofuse_acc: {} \n'.format(label2_nofuse_acc))
+                    .format(n_seg, merge_region, self.merge))
+            # f.write('\t label1_fuse_acc: {} \n'.format(label1_fuse_acc))
+            # f.write('\t label1_nofuse_acc: {} \n'.format(label1_nofuse_acc))
+            # f.write('\t label2_fuse_acc: {} \n'.format(label2_fuse_acc))
+            # f.write('\t label2_nofuse_acc: {} \n'.format(label2_nofuse_acc))
             f.write('\t pred1_fuse_acc: {} \n'.format(pred1_fuse_acc))
             f.write('\t pred1_nofuse_acc: {} \n'.format(pred1_nofuse_acc))
             f.write('\t pred2_fuse_acc: {} \n'.format(pred2_fuse_acc))

@@ -1,11 +1,8 @@
-/MergeTool/
-/images/
+/.idea
 /label/
-/out/
+/MergeTool/
+/origin_img/
 /outputs/
-/sp/
-/test/
-/test2/
+/xionganData/
 /note.txt
 /best_model.pth
-/xionganData/
