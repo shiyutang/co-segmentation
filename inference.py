@@ -476,11 +476,38 @@ def colorize_mask(mask, palette):
 # noinspection PyPep8Naming
 class ChangeDetection:
     def __init__(self):
+
+        # EXP Settings
+        self.exp = 'newlabels_thresh_0.5_nseg_1500'
+        self.record = True
+        self.test_index = 0
+
+        # Device
+        if torch.cuda.is_available():
+            self.device = torch.device('cuda:0')
+        else:
+            self.device = torch.device('cpu')
+
+        # Data
+        self.out_path = 'outputs/xiongan_change'+self.exp
+        if not os.path.exists(self.out_path):
+            os.makedirs(self.out_path)
+
+        self.datapath = './origin_img/xiongan'
+        if 'chengdu' in self.datapath:
+            img_ext, lbl_ext = 'jpg', 'png'
+            self.image_files = sorted(glob(os.path.join('./origin_img/chengdu', f'*.{img_ext}')))
+            self.label_files = sorted(glob(os.path.join('./label/chengdu', f'*.{lbl_ext}')))
+            self.num_pairs = len(self.image_files) // 2
+        else:
+            self.num_pairs = len(glob(os.path.join(self.datapath, '*')))
+            self.image_dirs = sorted(glob(os.path.join(self.datapath, '*')))
+
+        # Transform
         self.scales = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize([0.45734706, 0.43338275, 0.40058118], [0.23965294, 0.23532275, 0.2398498])
         self.num_classes = 8
-        self.exp = 'Xiongan_newlabels_0530'
         self.palette = [0, 0, 0,
                         150, 250, 0,
                         0, 250, 0,
@@ -489,12 +516,6 @@ class ChangeDetection:
                         255, 255, 255,
                         0, 0, 200,
                         0, 150, 250]
-
-        # device
-        if torch.cuda.is_available():
-            self.device = torch.device('cuda:0')
-        else:
-            self.device = torch.device('cpu')
 
         # Model
         self.model = PSPNet()
@@ -509,24 +530,9 @@ class ChangeDetection:
         self.model.to(self.device)
         self.model.eval()
 
-        # data
-        self.out_path = 'outputs/xiongan_change'
-        if not os.path.exists(self.out_path):
-            os.makedirs(self.out_path)
-            
-        self.datapath = './origin_img/xiongan'
-        if 'chengdu' in self.datapath:
-            img_ext, lbl_ext = 'jpg', 'png'
-            self.image_files = sorted(glob(os.path.join('./origin_img/chengdu', f'*.{img_ext}')))
-            self.label_files = sorted(glob(os.path.join('./label/chengdu', f'*.{lbl_ext}')))
-            self.num_pairs = len(self.image_files) // 2
-        else:
-            self.num_pairs = len(glob(os.path.join(self.datapath, '*')))
-            self.image_dirs = sorted(glob(os.path.join(self.datapath, '*')))
-
-        # settings
+        # SP merge params
         self.merge = False
-        self.n_segments, self.compactness, self.merge_regions = [200, 500, 1000, 1500, 2000], 10, [0]  # [50, 150, 500, 1000, 1500, 2000]
+        self.n_segments, self.compactness, self.merge_regions = [1500], 10, [0]  # [50, 150, 500, 1000, 1500, 2000]
         if self.merge:
             self.n_segments, self.merge_regions = [1000, 1500, 2000, 3000], [100, 150, 200]
 
@@ -534,8 +540,11 @@ class ChangeDetection:
         # testing
         with torch.no_grad():
             for index in range(0, self.num_pairs):
-                # if index<23:
-                #     continue
+                # test
+                if index < self.test_index:
+                    continue
+
+                # load data; change_gt
                 # for each pic in image_files, it will generate classes for each superpixel
                 if 'chengdu' in self.datapath:
                     image_paths = self.image_files[2 * index:2 * index + 2]
@@ -550,7 +559,7 @@ class ChangeDetection:
                     change_gt[label2 == 0] = 0
                 else:
                     image_paths = sorted(glob(os.path.join(self.image_dirs[index], '*.jpg')))
-                    
+
                     # the change based on labels
                     mask_path = glob(os.path.join(self.image_dirs[index], 'mask/*.tif'))[0]
                     change_gt = tifffile.imread(mask_path)
@@ -574,8 +583,8 @@ class ChangeDetection:
                                            self.merge, merge_regions=merge_region)
 
                         # record super pixel accuracy
-                        self.record_acc(sp_fused, sp1, sp2, prediction1, prediction2, n_seg, merge_region)
-                        continue
+                        if self.record:
+                            self.record_acc(sp_fused, sp1, sp2, prediction1, prediction2, n_seg, merge_region)
 
                         # change the prediction
                         prediction_SP1 = self.classOfSP(sp_fused, prediction1)
@@ -594,14 +603,14 @@ class ChangeDetection:
                         change_pred_change = self.change_detect_pred_change(sp_fused, change_seg, prediction1)
 
                         # metric
-                        correct = change_pred_change[change_gt == 1]
+                        correct = change_pred_change[change_gt != 0]
                         if len(correct) == 0:
                             print('***************************')
                             print('The incorrect data path is ', image_paths[0])
                             continue
                         recall = sum(correct) / len(correct)
                         precision = sum(correct) / sum(change_pred_change[change_pred_change == 1])
-                        f1_score = 2*((precision*recall)/(precision+recall))
+                        f1_score = 2 * ((precision * recall) / (precision + recall))
 
                         print('image {}, Recall: {}, precision: {}, f1score: {}'.format(
                             image_paths[0], recall, precision, f1_score))
@@ -618,8 +627,6 @@ class ChangeDetection:
                         self.save_images(change_gt, self.out_path_tmp, image_paths[0], 'change_gt')
                         self.save_images(change_seg, self.out_path_tmp, image_paths[0], 'change_seg')
                         self.save_images(change_pred_change, self.out_path_tmp, image_paths[0], 'change_pred_SP')
-
-
 
     def predict(self, image):
         inputs = self.normalize(self.to_tensor(image)).unsqueeze(0)
@@ -835,7 +842,7 @@ class ChangeDetection:
 
         return round(acc, 3)
 
-    def record_acc(self, sp_fused,  sp1, sp2, prediction1,
+    def record_acc(self, sp_fused, sp1, sp2, prediction1,
                    prediction2, n_seg, merge_region, label1=None, label2=None):
         # label1_fuse_acc = self.sp_accuracy(sp_fused, label1)
         # label1_nofuse_acc = self.sp_accuracy(sp1, label1)
@@ -848,8 +855,8 @@ class ChangeDetection:
 
         save_path = './result.txt'
         with open(save_path, 'a') as f:
-            f.write('########################################')
-            f.write('Experiment:{}'.format(self.exp))
+            f.write('########################################\n')
+            f.write('Experiment:{}\n'.format(self.exp))
 
             f.write('Result with n_seg = {}, merge_regions = {} and merge = {}: \n'
                     .format(n_seg, merge_region, self.merge))

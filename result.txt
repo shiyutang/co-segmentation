@@ -1,54 +1,465 @@
-Result with n_seg = 50, merge_regions = 0 and merge = False: 
-	 label1_fuse_acc: 0.802 
-	 label1_nofuse_acc: 0.703 
-	 label2_fuse_acc: 0.802 
-	 label2_nofuse_acc: 0.749 
-	 pred1_fuse_acc: 0.852 
-	 pred1_nofuse_acc: 0.774 
-	 pred2_fuse_acc: 0.848 
-	 pred2_nofuse_acc: 0.786 
-Result with n_seg = 150, merge_regions = 0 and merge = False: 
-	 label1_fuse_acc: 0.851 
-	 label1_nofuse_acc: 0.793 
-	 label2_fuse_acc: 0.854 
-	 label2_nofuse_acc: 0.809 
-	 pred1_fuse_acc: 0.891 
-	 pred1_nofuse_acc: 0.823 
-	 pred2_fuse_acc: 0.885 
-	 pred2_nofuse_acc: 0.836 
-Result with n_seg = 500, merge_regions = 0 and merge = False: 
-	 label1_fuse_acc: 0.914 
-	 label1_nofuse_acc: 0.865 
-	 label2_fuse_acc: 0.916 
-	 label2_nofuse_acc: 0.871 
-	 pred1_fuse_acc: 0.937 
-	 pred1_nofuse_acc: 0.897 
-	 pred2_fuse_acc: 0.93 
-	 pred2_nofuse_acc: 0.9 
-Result with n_seg = 1000, merge_regions = 0 and merge = False: 
-	 label1_fuse_acc: 0.934 
-	 label1_nofuse_acc: 0.898 
-	 label2_fuse_acc: 0.935 
-	 label2_nofuse_acc: 0.905 
-	 pred1_fuse_acc: 0.953 
-	 pred1_nofuse_acc: 0.923 
-	 pred2_fuse_acc: 0.952 
-	 pred2_nofuse_acc: 0.924 
-Result with n_seg = 1500, merge_regions = 0 and merge = False: 
-	 label1_fuse_acc: 0.947 
-	 label1_nofuse_acc: 0.92 
-	 label2_fuse_acc: 0.948 
-	 label2_nofuse_acc: 0.922 
-	 pred1_fuse_acc: 0.963 
-	 pred1_nofuse_acc: 0.937 
-	 pred2_fuse_acc: 0.964 
-	 pred2_nofuse_acc: 0.938 
-Result with n_seg = 2000, merge_regions = 0 and merge = False: 
-	 label1_fuse_acc: 0.955 
-	 label1_nofuse_acc: 0.929 
-	 label2_fuse_acc: 0.955 
-	 label2_nofuse_acc: 0.932 
-	 pred1_fuse_acc: 0.97 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.896 
+	 pred1_nofuse_acc: 0.85 
+	 pred2_fuse_acc: 0.866 
+	 pred2_nofuse_acc: 0.805 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.938 
+	 pred1_nofuse_acc: 0.914 
+	 pred2_fuse_acc: 0.912 
+	 pred2_nofuse_acc: 0.876 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.956 
+	 pred1_nofuse_acc: 0.939 
+	 pred2_fuse_acc: 0.936 
+	 pred2_nofuse_acc: 0.905 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.965 
 	 pred1_nofuse_acc: 0.949 
-	 pred2_fuse_acc: 0.969 
-	 pred2_nofuse_acc: 0.949 
+	 pred2_fuse_acc: 0.948 
+	 pred2_nofuse_acc: 0.92 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.968 
+	 pred1_nofuse_acc: 0.953 
+	 pred2_fuse_acc: 0.953 
+	 pred2_nofuse_acc: 0.926 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.889 
+	 pred1_nofuse_acc: 0.857 
+	 pred2_fuse_acc: 0.89 
+	 pred2_nofuse_acc: 0.854 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.935 
+	 pred1_nofuse_acc: 0.897 
+	 pred2_fuse_acc: 0.942 
+	 pred2_nofuse_acc: 0.91 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.946 
+	 pred1_nofuse_acc: 0.92 
+	 pred2_fuse_acc: 0.953 
+	 pred2_nofuse_acc: 0.913 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.956 
+	 pred1_nofuse_acc: 0.928 
+	 pred2_fuse_acc: 0.963 
+	 pred2_nofuse_acc: 0.937 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.962 
+	 pred1_nofuse_acc: 0.939 
+	 pred2_fuse_acc: 0.968 
+	 pred2_nofuse_acc: 0.948 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.946 
+	 pred1_nofuse_acc: 0.917 
+	 pred2_fuse_acc: 0.903 
+	 pred2_nofuse_acc: 0.899 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.966 
+	 pred1_nofuse_acc: 0.955 
+	 pred2_fuse_acc: 0.936 
+	 pred2_nofuse_acc: 0.912 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.976 
+	 pred1_nofuse_acc: 0.966 
+	 pred2_fuse_acc: 0.953 
+	 pred2_nofuse_acc: 0.929 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.98 
+	 pred1_nofuse_acc: 0.974 
+	 pred2_fuse_acc: 0.959 
+	 pred2_nofuse_acc: 0.942 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.984 
+	 pred1_nofuse_acc: 0.976 
+	 pred2_fuse_acc: 0.965 
+	 pred2_nofuse_acc: 0.946 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.881 
+	 pred1_nofuse_acc: 0.865 
+	 pred2_fuse_acc: 0.851 
+	 pred2_nofuse_acc: 0.828 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.927 
+	 pred1_nofuse_acc: 0.895 
+	 pred2_fuse_acc: 0.905 
+	 pred2_nofuse_acc: 0.855 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.949 
+	 pred1_nofuse_acc: 0.925 
+	 pred2_fuse_acc: 0.937 
+	 pred2_nofuse_acc: 0.896 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.958 
+	 pred1_nofuse_acc: 0.936 
+	 pred2_fuse_acc: 0.948 
+	 pred2_nofuse_acc: 0.922 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.964 
+	 pred1_nofuse_acc: 0.946 
+	 pred2_fuse_acc: 0.955 
+	 pred2_nofuse_acc: 0.929 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.888 
+	 pred1_nofuse_acc: 0.856 
+	 pred2_fuse_acc: 0.853 
+	 pred2_nofuse_acc: 0.789 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.925 
+	 pred1_nofuse_acc: 0.904 
+	 pred2_fuse_acc: 0.901 
+	 pred2_nofuse_acc: 0.856 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.951 
+	 pred1_nofuse_acc: 0.93 
+	 pred2_fuse_acc: 0.932 
+	 pred2_nofuse_acc: 0.898 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.959 
+	 pred1_nofuse_acc: 0.943 
+	 pred2_fuse_acc: 0.94 
+	 pred2_nofuse_acc: 0.911 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.964 
+	 pred1_nofuse_acc: 0.948 
+	 pred2_fuse_acc: 0.948 
+	 pred2_nofuse_acc: 0.922 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.833 
+	 pred1_nofuse_acc: 0.721 
+	 pred2_fuse_acc: 0.829 
+	 pred2_nofuse_acc: 0.778 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.894 
+	 pred1_nofuse_acc: 0.836 
+	 pred2_fuse_acc: 0.885 
+	 pred2_nofuse_acc: 0.842 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.931 
+	 pred1_nofuse_acc: 0.888 
+	 pred2_fuse_acc: 0.927 
+	 pred2_nofuse_acc: 0.892 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.94 
+	 pred1_nofuse_acc: 0.906 
+	 pred2_fuse_acc: 0.937 
+	 pred2_nofuse_acc: 0.904 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.952 
+	 pred1_nofuse_acc: 0.921 
+	 pred2_fuse_acc: 0.95 
+	 pred2_nofuse_acc: 0.919 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.917 
+	 pred1_nofuse_acc: 0.855 
+	 pred2_fuse_acc: 0.89 
+	 pred2_nofuse_acc: 0.833 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.938 
+	 pred1_nofuse_acc: 0.9 
+	 pred2_fuse_acc: 0.923 
+	 pred2_nofuse_acc: 0.875 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.958 
+	 pred1_nofuse_acc: 0.93 
+	 pred2_fuse_acc: 0.945 
+	 pred2_nofuse_acc: 0.915 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.965 
+	 pred1_nofuse_acc: 0.936 
+	 pred2_fuse_acc: 0.955 
+	 pred2_nofuse_acc: 0.935 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.969 
+	 pred1_nofuse_acc: 0.948 
+	 pred2_fuse_acc: 0.961 
+	 pred2_nofuse_acc: 0.942 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.984 
+	 pred1_nofuse_acc: 0.981 
+	 pred2_fuse_acc: 0.913 
+	 pred2_nofuse_acc: 0.896 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.987 
+	 pred1_nofuse_acc: 0.979 
+	 pred2_fuse_acc: 0.925 
+	 pred2_nofuse_acc: 0.916 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.988 
+	 pred1_nofuse_acc: 0.984 
+	 pred2_fuse_acc: 0.936 
+	 pred2_nofuse_acc: 0.918 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.99 
+	 pred1_nofuse_acc: 0.985 
+	 pred2_fuse_acc: 0.945 
+	 pred2_nofuse_acc: 0.929 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.99 
+	 pred1_nofuse_acc: 0.986 
+	 pred2_fuse_acc: 0.95 
+	 pred2_nofuse_acc: 0.931 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.878 
+	 pred1_nofuse_acc: 0.844 
+	 pred2_fuse_acc: 0.927 
+	 pred2_nofuse_acc: 0.913 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.909 
+	 pred1_nofuse_acc: 0.852 
+	 pred2_fuse_acc: 0.948 
+	 pred2_nofuse_acc: 0.933 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.93 
+	 pred1_nofuse_acc: 0.896 
+	 pred2_fuse_acc: 0.964 
+	 pred2_nofuse_acc: 0.951 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.945 
+	 pred1_nofuse_acc: 0.913 
+	 pred2_fuse_acc: 0.972 
+	 pred2_nofuse_acc: 0.956 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.949 
+	 pred1_nofuse_acc: 0.93 
+	 pred2_fuse_acc: 0.973 
+	 pred2_nofuse_acc: 0.958 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.883 
+	 pred1_nofuse_acc: 0.83 
+	 pred2_fuse_acc: 0.835 
+	 pred2_nofuse_acc: 0.781 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.926 
+	 pred1_nofuse_acc: 0.885 
+	 pred2_fuse_acc: 0.891 
+	 pred2_nofuse_acc: 0.841 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.94 
+	 pred1_nofuse_acc: 0.908 
+	 pred2_fuse_acc: 0.912 
+	 pred2_nofuse_acc: 0.871 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.949 
+	 pred1_nofuse_acc: 0.923 
+	 pred2_fuse_acc: 0.923 
+	 pred2_nofuse_acc: 0.886 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.956 
+	 pred1_nofuse_acc: 0.932 
+	 pred2_fuse_acc: 0.934 
+	 pred2_nofuse_acc: 0.899 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.89 
+	 pred1_nofuse_acc: 0.849 
+	 pred2_fuse_acc: 0.826 
+	 pred2_nofuse_acc: 0.71 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.935 
+	 pred1_nofuse_acc: 0.891 
+	 pred2_fuse_acc: 0.885 
+	 pred2_nofuse_acc: 0.818 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.952 
+	 pred1_nofuse_acc: 0.922 
+	 pred2_fuse_acc: 0.916 
+	 pred2_nofuse_acc: 0.869 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.961 
+	 pred1_nofuse_acc: 0.937 
+	 pred2_fuse_acc: 0.931 
+	 pred2_nofuse_acc: 0.89 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.967 
+	 pred1_nofuse_acc: 0.949 
+	 pred2_fuse_acc: 0.94 
+	 pred2_nofuse_acc: 0.903 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.809 
+	 pred1_nofuse_acc: 0.738 
+	 pred2_fuse_acc: 0.78 
+	 pred2_nofuse_acc: 0.684 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.899 
+	 pred1_nofuse_acc: 0.857 
+	 pred2_fuse_acc: 0.879 
+	 pred2_nofuse_acc: 0.816 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.934 
+	 pred1_nofuse_acc: 0.894 
+	 pred2_fuse_acc: 0.918 
+	 pred2_nofuse_acc: 0.888 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.943 
+	 pred1_nofuse_acc: 0.918 
+	 pred2_fuse_acc: 0.928 
+	 pred2_nofuse_acc: 0.903 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.953 
+	 pred1_nofuse_acc: 0.928 
+	 pred2_fuse_acc: 0.94 
+	 pred2_nofuse_acc: 0.915 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.813 
+	 pred1_nofuse_acc: 0.73 
+	 pred2_fuse_acc: 0.861 
+	 pred2_nofuse_acc: 0.818 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.868 
+	 pred1_nofuse_acc: 0.784 
+	 pred2_fuse_acc: 0.905 
+	 pred2_nofuse_acc: 0.871 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.9 
+	 pred1_nofuse_acc: 0.847 
+	 pred2_fuse_acc: 0.932 
+	 pred2_nofuse_acc: 0.901 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.914 
+	 pred1_nofuse_acc: 0.87 
+	 pred2_fuse_acc: 0.938 
+	 pred2_nofuse_acc: 0.906 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.923 
+	 pred1_nofuse_acc: 0.887 
+	 pred2_fuse_acc: 0.945 
+	 pred2_nofuse_acc: 0.917 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.867 
+	 pred1_nofuse_acc: 0.809 
+	 pred2_fuse_acc: 0.845 
+	 pred2_nofuse_acc: 0.802 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.913 
+	 pred1_nofuse_acc: 0.871 
+	 pred2_fuse_acc: 0.903 
+	 pred2_nofuse_acc: 0.859 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.935 
+	 pred1_nofuse_acc: 0.902 
+	 pred2_fuse_acc: 0.928 
+	 pred2_nofuse_acc: 0.888 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.946 
+	 pred1_nofuse_acc: 0.919 
+	 pred2_fuse_acc: 0.941 
+	 pred2_nofuse_acc: 0.903 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.957 
+	 pred1_nofuse_acc: 0.932 
+	 pred2_fuse_acc: 0.95 
+	 pred2_nofuse_acc: 0.922 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.897 
+	 pred1_nofuse_acc: 0.86 
+	 pred2_fuse_acc: 0.891 
+	 pred2_nofuse_acc: 0.841 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.932 
+	 pred1_nofuse_acc: 0.889 
+	 pred2_fuse_acc: 0.925 
+	 pred2_nofuse_acc: 0.887 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.951 
+	 pred1_nofuse_acc: 0.927 
+	 pred2_fuse_acc: 0.946 
+	 pred2_nofuse_acc: 0.916 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.962 
+	 pred1_nofuse_acc: 0.943 
+	 pred2_fuse_acc: 0.957 
+	 pred2_nofuse_acc: 0.928 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.968 
+	 pred1_nofuse_acc: 0.949 
+	 pred2_fuse_acc: 0.964 
+	 pred2_nofuse_acc: 0.945 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.902 
+	 pred1_nofuse_acc: 0.853 
+	 pred2_fuse_acc: 0.895 
+	 pred2_nofuse_acc: 0.862 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.927 
+	 pred1_nofuse_acc: 0.879 
+	 pred2_fuse_acc: 0.928 
+	 pred2_nofuse_acc: 0.907 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.946 
+	 pred1_nofuse_acc: 0.911 
+	 pred2_fuse_acc: 0.946 
+	 pred2_nofuse_acc: 0.922 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.957 
+	 pred1_nofuse_acc: 0.929 
+	 pred2_fuse_acc: 0.956 
+	 pred2_nofuse_acc: 0.936 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.963 
+	 pred1_nofuse_acc: 0.94 
+	 pred2_fuse_acc: 0.959 
+	 pred2_nofuse_acc: 0.941 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.896 
+	 pred1_nofuse_acc: 0.85 
+	 pred2_fuse_acc: 0.866 
+	 pred2_nofuse_acc: 0.805 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.938 
+	 pred1_nofuse_acc: 0.914 
+	 pred2_fuse_acc: 0.912 
+	 pred2_nofuse_acc: 0.876 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.956 
+	 pred1_nofuse_acc: 0.939 
+	 pred2_fuse_acc: 0.936 
+	 pred2_nofuse_acc: 0.905 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.965 
+	 pred1_nofuse_acc: 0.949 
+	 pred2_fuse_acc: 0.948 
+	 pred2_nofuse_acc: 0.92 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.968 
+	 pred1_nofuse_acc: 0.953 
+	 pred2_fuse_acc: 0.953 
+	 pred2_nofuse_acc: 0.926 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.889 
+	 pred1_nofuse_acc: 0.857 
+	 pred2_fuse_acc: 0.89 
+	 pred2_nofuse_acc: 0.854 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.935 
+	 pred1_nofuse_acc: 0.897 
+	 pred2_fuse_acc: 0.942 
+	 pred2_nofuse_acc: 0.91 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.946 
+	 pred1_nofuse_acc: 0.92 
+	 pred2_fuse_acc: 0.953 
+	 pred2_nofuse_acc: 0.913 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.956 
+	 pred1_nofuse_acc: 0.928 
+	 pred2_fuse_acc: 0.963 
+	 pred2_nofuse_acc: 0.937 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 2000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.962 
+	 pred1_nofuse_acc: 0.939 
+	 pred2_fuse_acc: 0.968 
+	 pred2_nofuse_acc: 0.948 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 200, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.946 
+	 pred1_nofuse_acc: 0.917 
+	 pred2_fuse_acc: 0.903 
+	 pred2_nofuse_acc: 0.899 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 500, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.966 
+	 pred1_nofuse_acc: 0.955 
+	 pred2_fuse_acc: 0.936 
+	 pred2_nofuse_acc: 0.912 
+########################################Experiment:Xiongan_newlabels_0530Result with n_seg = 1000, merge_regions = 0 and merge = False: 
+	 pred1_fuse_acc: 0.976 
+	 pred1_nofuse_acc: 0.966 
+	 pred2_fuse_acc: 0.953 
+	 pred2_nofuse_acc: 0.929 
