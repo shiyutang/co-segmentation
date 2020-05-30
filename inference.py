@@ -480,7 +480,7 @@ class ChangeDetection:
         # EXP Settings
         self.exp = 'newlabels_thresh_0.5_nseg_1500'
         self.record = True
-        self.test_index = 0
+        self.test_index = 19
 
         # Device
         if torch.cuda.is_available():
@@ -489,7 +489,7 @@ class ChangeDetection:
             self.device = torch.device('cpu')
 
         # Data
-        self.out_path = 'outputs/xiongan_change'+self.exp
+        self.out_path = 'outputs/xiongan_change' + self.exp
         if not os.path.exists(self.out_path):
             os.makedirs(self.out_path)
 
@@ -532,9 +532,14 @@ class ChangeDetection:
 
         # SP merge params
         self.merge = False
-        self.n_segments, self.compactness, self.merge_regions = [1500], 10, [0]  # [50, 150, 500, 1000, 1500, 2000]
+        self.n_segments, self.compactness, self.merge_regions = [500], 10, [0]  # [50, 150, 500, 1000, 1500, 2000]
         if self.merge:
             self.n_segments, self.merge_regions = [1000, 1500, 2000, 3000], [100, 150, 200]
+        self.threshold = 0.5
+        self.ignore_pixels = 20
+
+        # result
+        self.Recall, self.precision, self.f1score = [], [], []
 
     def detect(self):
         # testing
@@ -611,6 +616,8 @@ class ChangeDetection:
                         recall = sum(correct) / len(correct)
                         precision = sum(correct) / sum(change_pred_change[change_pred_change == 1])
                         f1_score = 2 * ((precision * recall) / (precision + recall))
+                        self.Recall.append(recall)
+                        self.precision.append(precision)
 
                         print('image {}, Recall: {}, precision: {}, f1score: {}'.format(
                             image_paths[0], recall, precision, f1_score))
@@ -627,6 +634,10 @@ class ChangeDetection:
                         self.save_images(change_gt, self.out_path_tmp, image_paths[0], 'change_gt')
                         self.save_images(change_seg, self.out_path_tmp, image_paths[0], 'change_seg')
                         self.save_images(change_pred_change, self.out_path_tmp, image_paths[0], 'change_pred_SP')
+
+        recall_avg = sum(self.Recall) / len(self.Recall)
+        prec_avg = sum(self.precision) / len(self.precision)
+        return recall_avg, prec_avg
 
     def predict(self, image):
         inputs = self.normalize(self.to_tensor(image)).unsqueeze(0)
@@ -658,14 +669,13 @@ class ChangeDetection:
 
         return change_pred
 
-    @staticmethod
-    def change_detect_pred_change(sp_fused, change_seg, prediction1, threshold=0.5, ignore_pixels=20):
+    def change_detect_pred_change(self, sp_fused, change_seg, prediction1):
         outset = np.unique(sp_fused.flatten())  # the unique labels
         change_based_pred = np.zeros(sp_fused.shape)
         for i in outset:
             totalpix_sp = len(prediction1[sp_fused == i])
-            if totalpix_sp > ignore_pixels:
-                if sum(change_seg[sp_fused == i]) / totalpix_sp > threshold:
+            if totalpix_sp > self.ignore_pixels:
+                if sum(change_seg[sp_fused == i]) / totalpix_sp > self.threshold:
                     change_based_pred[sp_fused == i] = 1
         return change_based_pred
 
@@ -873,4 +883,7 @@ class ChangeDetection:
 
 if __name__ == '__main__':
     detector = ChangeDetection()
-    detector.detect()
+    recall, precision = detector.detect()
+    f1score = 2 * ((precision * recall) / (precision + recall))
+
+    print('recall: {} \n precision: {}, \n f1score:{}'.format(recall, precision, f1score))
