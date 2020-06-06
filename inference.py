@@ -21,6 +21,8 @@ from scipy import ndimage
 from tifffile import tifffile
 from torchvision import transforms
 from tqdm import tqdm
+from tifffile import tifffile
+import imagecodecs
 
 try:
     from urllib import urlretrieve
@@ -473,7 +475,7 @@ def colorize_mask(mask, palette):
     return new_mask
 
 
-# noinspection PyPep8Naming
+# noinspection PyPep8Naming,PyAttributeOutsideInit
 class ChangeDetection:
     def __init__(self):
 
@@ -493,7 +495,7 @@ class ChangeDetection:
         if not os.path.exists(self.out_path):
             os.makedirs(self.out_path)
 
-        self.datapath = './origin_img/xiongan'
+        self.datapath = './origin_img/xiongan_change'
         if 'chengdu' in self.datapath:
             img_ext, lbl_ext = 'jpg', 'png'
             self.image_files = sorted(glob(os.path.join('./origin_img/chengdu', f'*.{img_ext}')))
@@ -541,6 +543,40 @@ class ChangeDetection:
         # result
         self.Recall, self.precision, self.f1score = [], [], []
 
+    def load_datapath_change_gt(self, index):
+        # load data; change_gt
+        # for each pic in image_files, it will generate classes for each superpixel
+        if 'chengdu' in self.datapath:
+            self.image_paths = self.image_files[2 * index:2 * index + 2]
+
+            # the change based on labels
+            label1 = np.array(Image.open(self.label_files[2 * index]).convert('RGB'))
+            label2 = np.array(Image.open(self.label_files[2 * index + 1]).convert('RGB'))
+            label1, label2 = self.label2intarray(label1), self.label2intarray(label2)
+            change_gt = np.zeros(label1.shape)
+            change_gt[label1 != label2] = 1
+            change_gt[label1 == 0] = 0
+            change_gt[label2 == 0] = 0
+        else:
+            self.image_paths = sorted(glob(os.path.join(self.image_dirs[index], '*.jpg')))
+
+            # the change based on labels
+            mask_path = glob(os.path.join(self.image_dirs[index], 'mask/*.tif'))[0]
+            change_gt = tifffile.imread(mask_path)
+            change_gt = self.label2intarray(change_gt)
+
+        self.change_gt = change_gt
+
+    def openImage(self, img_path):
+        if "jpg" in img_path or "png" in img_path:
+            image = Image.open(img_path).convert('RGB')  # return Image object
+        elif "tiff" in img_path or "tif" in img_path:
+            image = tifffile.imread(img_path)  # returns numpy array
+        else:
+            raise TypeError("The input image format doesn\'t support, we only support png, jpg and tiff format ")
+
+        return image
+
     def detect(self):
         # testing
         with torch.no_grad():
@@ -549,36 +585,18 @@ class ChangeDetection:
                 if index < self.test_index:
                     continue
 
-                # load data; change_gt
-                # for each pic in image_files, it will generate classes for each superpixel
-                if 'chengdu' in self.datapath:
-                    image_paths = self.image_files[2 * index:2 * index + 2]
+                # get data
+                self.load_datapath_change_gt(index)
+                image1 = self.openImage(self.image_paths[0])
+                image2 = self.openImage(self.image_paths[1])
+                tensor1 = self.to_tensor(image1)[:3, :, :]
+                tensor2 = self.to_tensor(image2)[:3, :, :]
 
-                    # the change based on labels
-                    change_gt = np.zeros(sp_fused.shape)
-                    label1 = np.array(Image.open(self.label_files[2 * index]).convert('RGB'))
-                    label2 = np.array(Image.open(self.label_files[2 * index + 1]).convert('RGB'))
-                    label1, label2 = self.label2intarray(label1), self.label2intarray(label2)
-                    change_gt[label1 != label2] = 1
-                    change_gt[label1 == 0] = 0
-                    change_gt[label2 == 0] = 0
-                else:
-                    image_paths = sorted(glob(os.path.join(self.image_dirs[index], '*.jpg')))
+                # prediction
+                prediction1 = self.predict(tensor1)
+                prediction2 = self.predict(tensor2)
 
-                    # the change based on labels
-                    mask_path = glob(os.path.join(self.image_dirs[index], 'mask/*.tif'))[0]
-                    change_gt = tifffile.imread(mask_path)
-                    change_gt = self.label2intarray(change_gt)
-
-                image1 = Image.open(image_paths[0]).convert('RGB')
-                image2 = Image.open(image_paths[1]).convert('RGB')
-                # test
-                # print(image_paths[0], image_paths[1],
-                #       self.label_files[2 * index], self.label_files[2 * index + 1])
-
-                prediction1 = self.predict(image1)
                 # print('set(prediction1)', np.unique(prediction1))
-                prediction2 = self.predict(image2)
 
                 for n_seg in self.n_segments:
                     for merge_region in self.merge_regions:
@@ -592,59 +610,65 @@ class ChangeDetection:
                             self.record_acc(sp_fused, sp1, sp2, prediction1, prediction2, n_seg, merge_region)
 
                         # change the prediction
-                        prediction_SP1 = self.classOfSP(sp_fused, prediction1)
-                        prediction_SP2 = self.classOfSP(sp_fused, prediction2)
+                        self.prediction_SP1 = self.classOfSP(sp_fused, prediction1)
+                        self.prediction_SP2 = self.classOfSP(sp_fused, prediction2)
 
                         # the change based on fused SP class
-                        change_fusedSP = self.change_detect(prediction_SP1, prediction_SP2, sp_fused)
+                        self.change_fusedSP = self.change_detect(self.prediction_SP1, self.prediction_SP2, sp_fused)
 
                         # the change based on prediction
-                        change_seg = np.zeros(sp_fused.shape)
-                        change_seg[prediction1 != prediction2] = 1
-                        change_seg[prediction1 == 0] = 0
-                        change_seg[prediction2 == 0] = 0
+                        self.change_seg = np.zeros(sp_fused.shape)
+                        self.change_seg[prediction1 != prediction2] = 1
+                        self.change_seg[prediction1 == 0] = 0
+                        self.change_seg[prediction2 == 0] = 0
 
                         # the change based on fused SP filter pred change
-                        change_pred_change = self.change_detect_pred_change(sp_fused, change_seg, prediction1)
+                        self.change_pred_change = self.change_detect_pred_change(sp_fused, self.change_seg, prediction1)
 
-                        # metric
-                        correct = change_pred_change[change_gt != 0]
-                        if len(correct) == 0:
-                            print('***************************')
-                            print('The incorrect data path is ', image_paths[0])
-                            continue
-                        recall = sum(correct) / len(correct)
-                        precision = sum(correct) / sum(change_pred_change[change_pred_change == 1])
-                        f1_score = 2 * ((precision * recall) / (precision + recall))
-                        self.Recall.append(recall)
-                        self.precision.append(precision)
+                        self.save_reults(prediction1, prediction2)
 
-                        print('image {}, Recall: {}, precision: {}, f1score: {}'.format(
-                            image_paths[0], recall, precision, f1_score))
-
-                        # save prediction result on images
-                        match_idx = Path(image_paths[0])._parts[-2]
-                        self.out_path_tmp = os.path.join(self.out_path, match_idx)
-
-                        self.save_images(prediction1, self.out_path_tmp, image_paths[0], 'pred')
-                        self.save_images(prediction_SP1, self.out_path_tmp, image_paths[0], 'pred_afterSP')
-                        self.save_images(prediction2, self.out_path_tmp, image_paths[1], 'pred')
-                        self.save_images(prediction_SP2, self.out_path_tmp, image_paths[1], 'pred_afterSP')
-                        self.save_images(change_fusedSP, self.out_path_tmp, image_paths[0], 'change_SP')
-                        self.save_images(change_gt, self.out_path_tmp, image_paths[0], 'change_gt')
-                        self.save_images(change_seg, self.out_path_tmp, image_paths[0], 'change_seg')
-                        self.save_images(change_pred_change, self.out_path_tmp, image_paths[0], 'change_pred_SP')
-
+        # get metrics together
         recall_avg = sum(self.Recall) / len(self.Recall)
         prec_avg = sum(self.precision) / len(self.precision)
         return recall_avg, prec_avg
 
-    def predict(self, image):
-        inputs = self.normalize(self.to_tensor(image)).unsqueeze(0)
+    def predict(self, tensor):
+        inputs = self.normalize(tensor).unsqueeze(0)
         prediction = self.multi_scale_predict(inputs)
         prediction = F.softmax(torch.from_numpy(prediction), dim=0).argmax(0).cpu().numpy()
 
         return prediction
+
+    def cal_metrics(self, change_pred_change):
+        # metric
+        correct = change_pred_change[self.change_gt != 0]
+        if len(correct) == 0:
+            print('***************************')
+            print('The incorrect data path is ', self.image_paths[0])
+            return
+        recall = sum(correct) / len(correct)
+        precision = sum(correct) / sum(change_pred_change[change_pred_change == 1])
+        f1_score = 2 * ((precision * recall) / (precision + recall))
+        self.Recall.append(recall)
+        self.precision.append(precision)
+
+        print('image {}, Recall: {}, precision: {}, f1score: {}'.format(
+            self.image_paths[0], recall, precision, f1_score))
+
+    def save_results(self, prediction1, prediction2):
+        # save prediction result on images
+        match_idx = Path(self.image_paths[0])._parts[-2]
+        self.out_path_tmp = os.path.join(self.out_path, match_idx)
+
+        self.save_images(prediction1, self.out_path_tmp, self.image_paths[0], 'pred')
+        self.save_images(self.prediction_SP1, self.out_path_tmp, self.image_paths[0], 'pred_afterSP')
+        self.save_images(prediction2, self.out_path_tmp, self.image_paths[1], 'pred')
+        self.save_images(self.prediction_SP2, self.out_path_tmp, self.image_paths[1], 'pred_afterSP')
+        self.save_images(self.change_fusedSP, self.out_path_tmp, self.image_paths[0], 'change_SP')
+        self.save_images(self.change_gt, self.out_path_tmp, self.image_paths[0], 'change_gt')
+        self.save_images(self.change_seg, self.out_path_tmp, self.image_paths[0], 'change_seg')
+        self.save_images(self.change_pred_change, self.out_path_tmp, self.image_paths[0], 'change_pred_SP')
+        print('Success and save result to ', self.out_path_tmp)
 
     @staticmethod
     def change_detect(prediction_SP1, prediction_SP2, fused_sp, ignore_pixels=20):
@@ -710,9 +734,9 @@ class ChangeDetection:
         """
         if not os.path.exists(output_path):
             os.mkdir(output_path)
-        image_file = os.path.basename(image_file).split('.')[0]
+        image_file = os.path.basename(image_file)
         colorized_mask = colorize_mask(mask, self.palette)
-        colorized_mask.save(os.path.join(output_path, image_file + tag + '.png'))
+        colorized_mask.save(os.path.join(output_path, image_file[:-4] + tag + '.png'))
 
     # noinspection PyTypeChecker
     @staticmethod
