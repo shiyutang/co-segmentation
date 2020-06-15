@@ -480,8 +480,8 @@ class ChangeDetection:
     def __init__(self):
 
         # EXP Settings
-        self.exp = 'newlabels_thresh_0.5_nseg_1500'
-        self.record = True
+        self.exp = 'updatelabels_thresh_0.5_nseg_1500_0615'
+        self.record_spAcc = True
         self.test_index = 19
 
         # Device
@@ -559,6 +559,7 @@ class ChangeDetection:
             change_gt[label2 == 0] = 0
         else:
             self.image_paths = sorted(glob(os.path.join(self.image_dirs[index], '*.jpg')))
+            self.label_paths = sorted(glob(os.path.join(self.image_dirs[index], '*.png')))
 
             # the change based on labels
             mask_path = glob(os.path.join(self.image_dirs[index], 'mask/*.tif'))[0]
@@ -573,7 +574,7 @@ class ChangeDetection:
         elif "tiff" in img_path or "tif" in img_path:
             image = tifffile.imread(img_path)  # returns numpy array
         else:
-            raise TypeError("The input image format doesn\'t support, we only support png, jpg and tiff format ")
+            raise TypeError("The input image format doesn\'t support, we only support png, jpg and tif/tiff format ")
 
         return image
 
@@ -589,14 +590,17 @@ class ChangeDetection:
                 self.load_datapath_change_gt(index)
                 image1 = self.openImage(self.image_paths[0])
                 image2 = self.openImage(self.image_paths[1])
+                # label1 = self.openImage(self.label_paths[0])
+                # label2 = self.openImage(self.label_paths[1])
                 tensor1 = self.to_tensor(image1)[:3, :, :]
                 tensor2 = self.to_tensor(image2)[:3, :, :]
 
                 # prediction
                 prediction1 = self.predict(tensor1)
                 prediction2 = self.predict(tensor2)
-
                 # print('set(prediction1)', np.unique(prediction1))
+
+                # prediction acc todo
 
                 for n_seg in self.n_segments:
                     for merge_region in self.merge_regions:
@@ -606,7 +610,7 @@ class ChangeDetection:
                                            self.merge, merge_regions=merge_region)
 
                         # record super pixel accuracy
-                        if self.record:
+                        if self.record_spAcc:
                             self.record_acc(sp_fused, sp1, sp2, prediction1, prediction2, n_seg, merge_region)
 
                         # change the prediction
@@ -625,7 +629,8 @@ class ChangeDetection:
                         # the change based on fused SP filter pred change
                         self.change_pred_change = self.change_detect_pred_change(sp_fused, self.change_seg, prediction1)
 
-                        self.save_reults(prediction1, prediction2)
+                        self.save_results(prediction1, prediction2)
+                        self.cal_metrics(change_pred_change=self.change_pred_change)
 
         # get metrics together
         recall_avg = sum(self.Recall) / len(self.Recall)
