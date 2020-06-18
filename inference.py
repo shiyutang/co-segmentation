@@ -1,15 +1,13 @@
 import copy
 import logging
+import math
 import os
-import re
 import sys
 import zipfile
 from collections import Counter
 from collections import OrderedDict
 from glob import glob
 from itertools import chain
-
-import math
 from pathlib import Path
 
 import numpy as np
@@ -20,9 +18,6 @@ from PIL import Image
 from scipy import ndimage
 from tifffile import tifffile
 from torchvision import transforms
-from tqdm import tqdm
-from tifffile import tifffile
-import imagecodecs
 
 try:
     from urllib import urlretrieve
@@ -442,12 +437,12 @@ class PSPNet(BaseModel):
         x = self.layer4(x_aux)
 
         output = self.master_branch(x)
-        output = F.interpolate(output, size=input_size, mode='bilinear')
+        output = F.interpolate(output, size=input_size, mode='bilinear', align_corners=False)
         output = output[:, :, :input_size[0], :input_size[1]]
 
         if self.training and self.use_aux:
             aux = self.auxiliary_branch(x_aux)
-            aux = F.interpolate(aux, size=input_size, mode='bilinear')
+            aux = F.interpolate(aux, size=input_size, mode='bilinear', align_corners=False)
             aux = aux[:, :, :input_size[0], :input_size[1]]
             return output, aux
         return output
@@ -480,25 +475,27 @@ class ChangeDetection:
     def __init__(self):
 
         # EXP Settings
-        self.exp = 'updatelabels_thresh_0.5_nseg_1500_0615'
-        self.record_spAcc = True
+        self.exp = 'xiongan_updatelabels_thresh_0.7_nseg_1500_0618'
+        self.record_spAcc = False
         self.test_index = 19
+        self.use_gpu = True
 
         # Device
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and self.use_gpu:
             self.device = torch.device('cuda:0')
         else:
             self.device = torch.device('cpu')
 
         # Data
-        self.out_path = 'outputs/xiongan_change' + self.exp
+        self.out_path = './outputs/' + self.exp
         if not os.path.exists(self.out_path):
             os.makedirs(self.out_path)
 
         self.datapath = './origin_img/xiongan_change'
         if 'chengdu' in self.datapath:
             img_ext, lbl_ext = 'jpg', 'png'
-            self.image_files = sorted(glob(os.path.join('./origin_img/chengdu', f'*.{img_ext}')))
+            self.image_files = sorted(
+                glob(os.path.join('./origin_img/chengdu', f'*.{img_ext}')))
             self.label_files = sorted(glob(os.path.join('./label/chengdu', f'*.{lbl_ext}')))
             self.num_pairs = len(self.image_files) // 2
         else:
@@ -537,11 +534,11 @@ class ChangeDetection:
         self.n_segments, self.compactness, self.merge_regions = [500], 10, [0]  # [50, 150, 500, 1000, 1500, 2000]
         if self.merge:
             self.n_segments, self.merge_regions = [1000, 1500, 2000, 3000], [100, 150, 200]
-        self.threshold = 0.5
+        self.threshold = 0.7
         self.ignore_pixels = 20
 
         # result
-        self.Recall, self.precision, self.f1score = [], [], []
+        self.Recall, self.precision, self.pixAcc = [], [], []
 
     def load_datapath_change_gt(self, index):
         # load data; change_gt
@@ -562,9 +559,9 @@ class ChangeDetection:
             self.label_paths = sorted(glob(os.path.join(self.image_dirs[index], '*.png')))
 
             # the change based on labels
-            mask_path = glob(os.path.join(self.image_dirs[index], 'mask/*.tif'))[0]
+            mask_path = glob(os.path.join(self.image_dirs[index], 'mask/*.tif'))[0]  # 只取第一张
             change_gt = tifffile.imread(mask_path)
-            change_gt = self.label2intarray(change_gt)
+            change_gt = self.label2intarray(change_gt, mode='NonZero')
 
         self.change_gt = change_gt
 
@@ -583,8 +580,8 @@ class ChangeDetection:
         with torch.no_grad():
             for index in range(0, self.num_pairs):
                 # test
-                if index < self.test_index:
-                    continue
+                # if index < self.test_index:
+                #     continue
 
                 # get data
                 self.load_datapath_change_gt(index)
@@ -599,8 +596,6 @@ class ChangeDetection:
                 prediction1 = self.predict(tensor1)
                 prediction2 = self.predict(tensor2)
                 # print('set(prediction1)', np.unique(prediction1))
-
-                # prediction acc todo
 
                 for n_seg in self.n_segments:
                     for merge_region in self.merge_regions:
@@ -623,7 +618,7 @@ class ChangeDetection:
                         # the change based on prediction
                         self.change_seg = np.zeros(sp_fused.shape)
                         self.change_seg[prediction1 != prediction2] = 1
-                        self.change_seg[prediction1 == 0] = 0
+                        self.change_seg[prediction1 == 0] = 0  # 缺省类别忽略
                         self.change_seg[prediction2 == 0] = 0
 
                         # the change based on fused SP filter pred change
@@ -635,7 +630,8 @@ class ChangeDetection:
         # get metrics together
         recall_avg = sum(self.Recall) / len(self.Recall)
         prec_avg = sum(self.precision) / len(self.precision)
-        return recall_avg, prec_avg
+        pixAxx_avg = sum(self.pixAcc) / len(self.pixAcc)
+        return recall_avg, prec_avg, pixAxx_avg
 
     def predict(self, tensor):
         inputs = self.normalize(tensor).unsqueeze(0)
@@ -646,19 +642,27 @@ class ChangeDetection:
 
     def cal_metrics(self, change_pred_change):
         # metric
-        correct = change_pred_change[self.change_gt != 0]
-        if len(correct) == 0:
+        changes = change_pred_change[self.change_gt != 0]
+        if len(changes) == 0:
             print('***************************')
             print('The incorrect data path is ', self.image_paths[0])
             return
-        recall = sum(correct) / len(correct)
-        precision = sum(correct) / sum(change_pred_change[change_pred_change == 1])
-        f1_score = 2 * ((precision * recall) / (precision + recall))
+        recall = sum(changes) / len(changes)
+        precision = sum(changes) / sum(change_pred_change[change_pred_change == 1])
+        if recall>0 and precision>0:
+            f1_score = 2 * ((precision * recall) / (precision + recall))
+        else:
+            f1_score = 0
+
+        correct = change_pred_change == self.change_gt
+        pixelAcc = sum(sum(correct)) / correct.size
+
+        self.pixAcc.append(pixelAcc)
         self.Recall.append(recall)
         self.precision.append(precision)
 
-        print('image {}, Recall: {}, precision: {}, f1score: {}'.format(
-            self.image_paths[0], recall, precision, f1_score))
+        print('image {}, Recall: {}, precision: {}, f1score: {}, pixelAcc: {}'.format(
+            self.image_paths[0], recall, precision, f1_score, pixelAcc))
 
     def save_results(self, prediction1, prediction2):
         # save prediction result on images
@@ -699,6 +703,9 @@ class ChangeDetection:
         return change_pred
 
     def change_detect_pred_change(self, sp_fused, change_seg, prediction1):
+        '''
+        return numpy array changes
+        '''
         outset = np.unique(sp_fused.flatten())  # the unique labels
         change_based_pred = np.zeros(sp_fused.shape)
         for i in outset:
@@ -741,7 +748,10 @@ class ChangeDetection:
             os.mkdir(output_path)
         image_file = os.path.basename(image_file)
         colorized_mask = colorize_mask(mask, self.palette)
-        colorized_mask.save(os.path.join(output_path, image_file[:-4] + tag + '.png'))
+        if "tiff" in image_file:
+            colorized_mask.save(os.path.join(output_path, image_file[:-5] + tag + '.png'))
+        else:
+            colorized_mask.save(os.path.join(output_path, image_file[:-4] + tag + '.png'))
 
     # noinspection PyTypeChecker
     @staticmethod
@@ -844,11 +854,12 @@ class ChangeDetection:
         return fuse_prediction
 
     @staticmethod
-    def label2intarray(label):
+    def label2intarray(label, mode='palatte'):
         """
 
         :param label: the ndarray needs to be transfer into int-element-array
-        :return: the
+        :param mode: whether turn based on palatte or only find Non-zeros
+        :return: the numpy int labels
         """
         if len(label.shape) == 2:
             return label
@@ -859,10 +870,14 @@ class ChangeDetection:
         label_int = copy.deepcopy(label)
         for i in range(h):
             for j in range(w):
-                try:
-                    idx = palette.index(label[i][j])
-                except ValueError:
-                    idx = 1
+                if 'palatte' == mode:
+                    try:
+                        idx = palette.index(label[i][j])
+                    except ValueError:
+                        print('the value {} is not in palatte', label[i][j])
+                        idx = 255
+                elif mode == 'NonZero':
+                    idx = [0, 1][label[i][j] != [0, 0, 0]]
                 label_int[i][j] = idx
 
         return np.array(label_int)
@@ -912,7 +927,7 @@ class ChangeDetection:
 
 if __name__ == '__main__':
     detector = ChangeDetection()
-    recall, precision = detector.detect()
+    recall, precision, pixAcc = detector.detect()
     f1score = 2 * ((precision * recall) / (precision + recall))
 
-    print('recall: {} \n precision: {}, \n f1score:{}'.format(recall, precision, f1score))
+    print('recall: {} \n precision: {}, \n f1score:{}, \n pixelAcc:{}'.format(recall, precision, f1score, pixAcc))
