@@ -474,11 +474,21 @@ def colorize_mask(mask, palette):
 class ChangeDetection:
     def __init__(self):
 
-        # EXP Settings
-        self.exp = 'xiongan_updatelabels_thresh_0.7_nseg_1500_0618'
+        ################
+        # EXP Settings #
+        ################
+        self.exp = 'xiongan_updatelabels_thresh_0.5_nseg_1500_0704'
         self.record_spAcc = False
         self.test_index = 19
         self.use_gpu = True
+        # SP merge params
+        self.merge = False
+        self.n_segments, self.compactness, self.merge_regions = [1500], 10, [0]  # [50, 150, 500, 1000, 1500, 2000]
+        if self.merge:
+            self.n_segments, self.merge_regions = [1000, 1500, 2000, 3000], [100, 150, 200]
+        self.threshold = 0.5
+
+        self.ignore_pixels = 20
 
         # Device
         if torch.cuda.is_available() and self.use_gpu:
@@ -528,14 +538,6 @@ class ChangeDetection:
         self.model.load_state_dict(checkpoint)
         self.model.to(self.device)
         self.model.eval()
-
-        # SP merge params
-        self.merge = False
-        self.n_segments, self.compactness, self.merge_regions = [500], 10, [0]  # [50, 150, 500, 1000, 1500, 2000]
-        if self.merge:
-            self.n_segments, self.merge_regions = [1000, 1500, 2000, 3000], [100, 150, 200]
-        self.threshold = 0.7
-        self.ignore_pixels = 20
 
         # result
         self.Recall, self.precision, self.pixAcc = [], [], []
@@ -649,7 +651,7 @@ class ChangeDetection:
             return
         recall = sum(changes) / len(changes)
         precision = sum(changes) / sum(change_pred_change[change_pred_change == 1])
-        if recall>0 and precision>0:
+        if recall > 0 and precision > 0:
             f1_score = 2 * ((precision * recall) / (precision + recall))
         else:
             f1_score = 0
@@ -695,17 +697,13 @@ class ChangeDetection:
                 if prediction_SP1[fused_sp == i][0] != prediction_SP2[fused_sp == i][0] and \
                         prediction_SP2[fused_sp == i][0] != 0 and prediction_SP1[fused_sp == i][0] != 0:
                     change_pred[fused_sp == i] = 1
-            # test if i == 0: print('sp_fused == i', sp_fused == i)  # true/False
-            # list print('prediction1[sp_fused==i]', prediction1[sp_fused == i])
-            # [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 ]
-            # print('change', change)
 
         return change_pred
 
     def change_detect_pred_change(self, sp_fused, change_seg, prediction1):
-        '''
+        """
         return numpy array changes
-        '''
+        """
         outset = np.unique(sp_fused.flatten())  # the unique labels
         change_based_pred = np.zeros(sp_fused.shape)
         for i in outset:
@@ -848,15 +846,11 @@ class ChangeDetection:
             mostpred, times = Counter(prediction[sp == i]).most_common(1)[0]
             fuse_prediction[sp == i] = mostpred
 
-        # test
-        # print('fuse_prediction', fuse_prediction)
-
         return fuse_prediction
 
     @staticmethod
     def label2intarray(label, mode='palatte'):
         """
-
         :param label: the ndarray needs to be transfer into int-element-array
         :param mode: whether turn based on palatte or only find Non-zeros
         :return: the numpy int labels
@@ -898,6 +892,7 @@ class ChangeDetection:
 
     def record_acc(self, sp_fused, sp1, sp2, prediction1,
                    prediction2, n_seg, merge_region, label1=None, label2=None):
+        # sp accuracy based on label
         # label1_fuse_acc = self.sp_accuracy(sp_fused, label1)
         # label1_nofuse_acc = self.sp_accuracy(sp1, label1)
         # label2_fuse_acc = self.sp_accuracy(sp_fused, label2)
