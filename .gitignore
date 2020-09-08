@@ -1,6 +1,6 @@
 /.idea
 /label/
-/MergeTool/
+/MergeTool
 /origin_img/
 /outputs/
 /xionganData/
@@ -11,3 +11,11 @@
 
 /best_model_pspnet_3.pth
 /checkpoint-epoch132.pth
+/shijiazhuangData/
+co-seg.py
+Merge.tif
+MGslic.py
+Superpixel.tif
+test MG.py
+tmp.txt
+transform_weishen.pys

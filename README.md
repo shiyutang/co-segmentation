@@ -62,7 +62,7 @@
   },
   "Output": {
     "record_SP_Acc": true,                            # 是否将超像素的精度记录在 SP_outpath 中     
-    "SP_outpath": "./result.txt"                      # 超像素精度的输出位置
+    "SP_outpath": "./result.txt",                     # 超像素精度的输出位置
     "img_outpath": "./outputs/shijiazhuang_thresh_0.5_nseg_1500_0907", # 图像的输出位置
   },
   "SP_setting": {
