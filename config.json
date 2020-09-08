@@ -1,0 +1,37 @@
+{
+  "Exp": {
+    "name": "shijiazhuang_thresh_0.5_nseg_1500_0907",
+    "use_gpu": true,
+    "checkpoint": "./best_model.pth",
+    "classes": 8,
+    "palette": [0, 0, 0,
+                150, 250, 0,
+                0, 250, 0,
+                0, 100, 0,
+                200, 0, 0,
+                255, 255, 255,
+                0, 0, 200,
+                0, 150, 250]
+  },
+  "Data": {
+    "path": "./origin_img/shijiazhuang"
+  },
+  "Output": {
+    "record_SP_Acc": true,
+    "img_outpath": "./outputs/shijiazhuang_thresh_0.5_nseg_1500_0907",
+    "SP_outpath": "./result.txt"
+  },
+  "SP_setting": {
+    "if_merge": false,
+    "n_segments": [1500],
+    "compactness": 10,
+    "merge_regions": [0],
+    "threshold": 0.5,
+    "ignore_pixels": 20
+  },
+  "Transform": {
+    "scales": [0.75, 1.0, 1.25, 1.5, 1.75, 2.0],
+    "normalizeX": [0.45734706, 0.43338275, 0.40058118],
+    "normalizeY": [0.23965294, 0.23532275, 0.2398498]
+  }
+}

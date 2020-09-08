@@ -31,32 +31,32 @@ palette = list([[0, 0, 0], [150, 250, 0], [0, 250, 0], [0, 100, 0],
                 [200, 0, 0], [255, 255, 255], [0, 0, 200], [0, 150, 250]])
 
 
-def test():
-    lbl_ext = "png"
-    label_files = sorted(glob(os.path.join('label', f'*.{lbl_ext}')))
-    label1 = np.array(Image.open(label_files[0]).convert('RGB'))
-    label2 = np.array(Image.open(label_files[1]).convert('RGB'))
-    change_gt = np.zeros(label1.shape)
-    label1, label2 = label2intarray(label1, trans_palette=mappalette), \
-                     label2intarray(label2, trans_palette=mappalette)
-    change_gt[label1 != label2] = 1
-    change_gt[label1 == 0] = 0
-    change_gt[label2 == 0] = 0
-    save_images(change_gt, cat_dir, labellist[0].stem, 'change_gt')
+# def test():
+#     lbl_ext = "png"
+#     label_files = sorted(glob(os.path.join('label', f'*.{lbl_ext}')))
+#     label1 = np.array(Image.open(label_files[0]).convert('RGB'))
+#     label2 = np.array(Image.open(label_files[1]).convert('RGB'))
+#     change_gt = np.zeros(label1.shape)
+#     label1, label2 = label2intarray(label1, trans_palette=mappalette), \
+#                      label2intarray(label2, trans_palette=mappalette)
+#     change_gt[label1 != label2] = 1
+#     change_gt[label1 == 0] = 0
+#     change_gt[label2 == 0] = 0
+#     save_images(change_gt, cat_dir, labellist[0].stem, 'change_gt')
 
 
-def change_gt(index, save_dir):
-    # find gt
-    label1 = np.array(Image.open(labellist[index]).convert('RGB'))
-    label2 = np.array(Image.open(labellist[index + 1]).convert('RGB'))
-
-    label1, label2 = label2intarray(label1, trans_palette=mappalette), \
-                     label2intarray(label2, trans_palette=mappalette)
-    change_gt = np.zeros(label1.shape)
-    change_gt[label1 != label2] = 1
-    change_gt[label1 == 0] = 0
-    change_gt[label2 == 0] = 0
-    save_images(change_gt, save_dir, labellist[index].stem, 'change_gt')
+# def change_gt(index, save_dir):
+#     # find gt
+#     label1 = np.array(Image.open(labellist[index]).convert('RGB'))
+#     label2 = np.array(Image.open(labellist[index + 1]).convert('RGB'))
+#
+#     label1, label2 = label2intarray(label1, trans_palette=mappalette), \
+#                      label2intarray(label2, trans_palette=mappalette)
+#     change_gt = np.zeros(label1.shape)
+#     change_gt[label1 != label2] = 1
+#     change_gt[label1 == 0] = 0
+#     change_gt[label2 == 0] = 0
+#     save_images(change_gt, save_dir, labellist[index].stem, 'change_gt')
 
 
 def label2intarray(label, trans_palette):
@@ -103,50 +103,45 @@ def save_images(mask, output_path=None, image_file=None, tag=None, savePath=None
     colorized_mask.save(savePath)
 
 
-read_path = Path(r'D:\school\change detection\co-segmentation\xionganData')
-dir_list = [read_path.joinpath(f) for f in read_path.glob('0*')]
+read_path = Path(r'D:\Shiyu\School\change detection\co-segmentation\origin_img\shijiazhuang')
+dir_list = [read_path.joinpath(f) for f in read_path.glob('*')]
 print('dir_list', dir_list)
 
 height, width = 800, 800
 
 for cat_dir in dir_list:
-    cat_dir = Path(cat_dir)
-    if '007' not in str(cat_dir):
-        continue
-
-    image_list = [f for f in cat_dir.glob('*[^segimg]')]
-    print(len(image_list))
-
+    # save directory
     savedir = cat_dir.joinpath('segimg')
     if not savedir.exists():
         savedir.mkdir()
 
-    # for image_name in image_list:
-    #     print('image_name', image_name)
-    #     im = Image.open(image_name)
-    #     im = np.array(im)
-    #     im_height, im_width, channel = im.shape
-    #     im_name = str(image_name).split('\\')[-1]
-    #     if 'label' in str(image_name):
-    #         save_ext = '.png'
-    #     else:
-    #         save_ext = '.jpg'
-    #
-    #     for i in range(im_height // height):
-    #         for j in range(im_width // width):
-    #             save_name = 'Hid{}_Wid{}_'.format(i, j) + im_name[:-4] + save_ext
-    #             print('start save {}'.format(save_name))
-    #             crop = im[i * height:(i + 1) * height, j * width:(j + 1) * width, :]
-    #             crop_im = Image.fromarray(crop)
-    #             crop_im.save(os.path.join(savedir, save_name))
-    labellist = [f for f in savedir.glob('*label*')]
-    print('labellist', labellist)
+    # cut and save
+    for image_name in cat_dir.glob('*.png'):
+        print('image_name', image_name)
+        im = Image.open(image_name)
+        im = np.array(im)
+        im_height, im_width, channel = im.shape
+        im_name = str(image_name).split('\\')[-1]
+        if 'label' in str(image_name):
+            save_ext = '.png'
+        else:
+            save_ext = '.jpg'
 
-    # test()
-    # for i in range(len(labellist) // 2):
-    #     change_gt(index=2 * i, save_dir=savedir)
+        for i in range(im_height // height):
+            for j in range(im_width // width):
+                save_name = 'Hid{}_Wid{}_'.format(i, j) + im_name[:-4] + save_ext
+                print('start save {}'.format(save_name))
+                crop = im[i * height:(i + 1) * height, j * width:(j + 1) * width, :]
+                crop_im = Image.fromarray(crop)
+                crop_im.save(os.path.join(savedir, save_name))
 
-    for labelname in labellist:
-        label = np.array(Image.open(labelname).convert('RGB'))
-        label = label2intarray(label, trans_palette=mappalette)
-        save_images(label, savePath=labelname)
+    # # change label from RGB to index array
+    # labellist = [f for f in savedir.glob('*label*')]
+    # print('labellist', labellist)
+    # # test()
+    # # for i in range(len(labellist) // 2):
+    # #     change_gt(index=2 * i, save_dir=savedir)
+    # for labelname in labellist:
+    #     label = np.array(Image.open(labelname).convert('RGB'))
+    #     label = label2intarray(label, trans_palette=mappalette)
+    #     save_images(label, savePath=labelname)

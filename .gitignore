@@ -9,3 +9,5 @@
 /best_model_olddata.pth
 /tmp.txt
 
+/best_model_pspnet_3.pth
+/checkpoint-epoch132.pth

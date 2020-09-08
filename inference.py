@@ -1,4 +1,6 @@
+import argparse
 import copy
+import json
 import logging
 import math
 import os
@@ -294,12 +296,12 @@ class BaseModel(nn.Module):
     def summary(self):
         model_parameters = filter(lambda p: p.requires_grad, self.parameters())
         nbr_params = sum([np.prod(p.size()) for p in model_parameters])
-        self.logger.info(f'Nbr of trainable parameters: {nbr_params}')
+        self.logger.info('Nbr of trainable parameters: {nbr_params}'.format(nbr_params))
 
     def __str__(self):
         model_parameters = filter(lambda p: p.requires_grad, self.parameters())
         nbr_params = sum([np.prod(p.size()) for p in model_parameters])
-        return super(BaseModel, self).__str__() + f'\nNbr of trainable parameters: {nbr_params}'
+        return super(BaseModel, self).__str__() + '\nNbr of trainable parameters: {}'.format(nbr_params)
 
 
 def set_trainable_attr(m, b):
@@ -472,64 +474,63 @@ def colorize_mask(mask, palette):
 
 # noinspection PyPep8Naming,PyAttributeOutsideInit
 class ChangeDetection:
-    def __init__(self):
-
+    def __init__(self, config):
         ################
         # EXP Settings #
         ################
-        self.exp = 'xiongan_updatelabels_thresh_0.5_nseg_1500_0704'
-        self.record_spAcc = False
-        self.test_index = 19
-        self.use_gpu = True
+        self.exp = config["Exp"]["name"]
+        self.config = config
+        self.record_spAcc = config['Output']["record_SP_Acc"]  # save superpixel accuracy to a txt file
         # SP merge params
-        self.merge = False
-        self.n_segments, self.compactness, self.merge_regions = [1500], 10, [0]  # [50, 150, 500, 1000, 1500, 2000]
+        self.n_segments = config["SP_setting"]["n_segments"]
+        self.compactness = config["SP_setting"]["compactness"]
+        self.merge_regions = config["SP_setting"]["merge_regions"]
+        self.merge = config["SP_setting"]["if_merge"]
         if self.merge:
             self.n_segments, self.merge_regions = [1000, 1500, 2000, 3000], [100, 150, 200]
-        self.threshold = 0.5
-
-        self.ignore_pixels = 20
+        # SP 整形参数
+        self.threshold = config["SP_setting"]["threshold"]
+        self.ignore_pixels = config["SP_setting"]["ignore_pixels"]
 
         # Device
+        self.use_gpu = config["Exp"]["use_gpu"]
         if torch.cuda.is_available() and self.use_gpu:
             self.device = torch.device('cuda:0')
         else:
             self.device = torch.device('cpu')
 
-        # Data
-        self.out_path = './outputs/' + self.exp
+        # output Data
+        self.out_path = config['Output']["img_outpath"]
         if not os.path.exists(self.out_path):
             os.makedirs(self.out_path)
 
-        self.datapath = './origin_img/xiongan_change'
+        # input data
+        self.datapath = config["Data"]["path"]
         if 'chengdu' in self.datapath:
             img_ext, lbl_ext = 'jpg', 'png'
             self.image_files = sorted(
-                glob(os.path.join('./origin_img/chengdu', f'*.{img_ext}')))
-            self.label_files = sorted(glob(os.path.join('./label/chengdu', f'*.{lbl_ext}')))
+                glob(os.path.join(self.datapath, '*.{}'.format(img_ext))))
+            self.label_files = sorted(glob(os.path.join('./label/chengdu', '*.{}'.format(lbl_ext))))
             self.num_pairs = len(self.image_files) // 2
+        elif 'xiongan' in self.datapath:
+            self.num_pairs = len(glob(os.path.join(self.datapath, '*')))
+            self.image_dirs = sorted(glob(os.path.join(self.datapath, '*')))
         else:
             self.num_pairs = len(glob(os.path.join(self.datapath, '*')))
             self.image_dirs = sorted(glob(os.path.join(self.datapath, '*')))
 
         # Transform
-        self.scales = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+        self.scales = config["Transform"]["scales"]
         self.to_tensor = transforms.ToTensor()
-        self.normalize = transforms.Normalize([0.45734706, 0.43338275, 0.40058118], [0.23965294, 0.23532275, 0.2398498])
-        self.num_classes = 8
-        self.palette = [0, 0, 0,
-                        150, 250, 0,
-                        0, 250, 0,
-                        0, 100, 0,
-                        200, 0, 0,
-                        255, 255, 255,
-                        0, 0, 200,
-                        0, 150, 250]
+        self.normalize = transforms.Normalize(config["Transform"]["normalizeX"],
+                                              config["Transform"]["normalizeY"])
+        self.num_classes = config["Exp"]["classes"]
+        self.palette = config["Exp"]["palette"]
 
         # Model
         self.model = PSPNet()
 
-        checkpoint = torch.load('./best_model.pth', map_location=self.device)
+        checkpoint = torch.load(config["Exp"]["checkpoint"], map_location=self.device)
         if isinstance(checkpoint, dict) and 'state_dict' in checkpoint.keys():
             checkpoint = checkpoint['state_dict']
         if 'module' in list(checkpoint.keys())[0] and not isinstance(self.model, torch.nn.DataParallel):
@@ -540,32 +541,38 @@ class ChangeDetection:
         self.model.eval()
 
         # result
-        self.Recall, self.precision, self.pixAcc = [], [], []
+        self.Recall_seg_SP, self.precision_seg_SP, self.pixAcc_seg_SP = [], [], []
+        self.Recall_seg, self.precision_seg, self.pixAcc_seg = [], [], []
+        self.Recall_SP, self.precision_SP, self.pixAcc_SP = [], [], []
 
     def load_datapath_change_gt(self, index):
-        # load data; change_gt
+        # load data: change_gt
         # for each pic in image_files, it will generate classes for each superpixel
         if 'chengdu' in self.datapath:
             self.image_paths = self.image_files[2 * index:2 * index + 2]
-
             # the change based on labels
             label1 = np.array(Image.open(self.label_files[2 * index]).convert('RGB'))
             label2 = np.array(Image.open(self.label_files[2 * index + 1]).convert('RGB'))
-            label1, label2 = self.label2intarray(label1), self.label2intarray(label2)
+            label1, label2 = self.RGB2Index(label1), self.RGB2Index(label2)
             change_gt = np.zeros(label1.shape)
             change_gt[label1 != label2] = 1
             change_gt[label1 == 0] = 0
             change_gt[label2 == 0] = 0
-        else:
+            self.change_gt = change_gt
+
+        elif 'xiongan' in self.datapath:
             self.image_paths = sorted(glob(os.path.join(self.image_dirs[index], '*.jpg')))
             self.label_paths = sorted(glob(os.path.join(self.image_dirs[index], '*.png')))
 
             # the change based on labels
             mask_path = glob(os.path.join(self.image_dirs[index], 'mask/*.tif'))[0]  # 只取第一张
             change_gt = tifffile.imread(mask_path)
-            change_gt = self.label2intarray(change_gt, mode='NonZero')
+            change_gt = self.RGB2Index(change_gt, mode='NonZero')
+            self.change_gt = change_gt
 
-        self.change_gt = change_gt
+        elif 'shijiazhuang' in self.datapath:
+            self.image_paths = sorted(glob(os.path.join(self.image_dirs[index], '*.jpg')))
+            # shijiazhuang 没有变化真值，因此不能记录metric 和 输出真值图像
 
     def openImage(self, img_path):
         if "jpg" in img_path or "png" in img_path:
@@ -580,21 +587,15 @@ class ChangeDetection:
     def detect(self):
         # testing
         with torch.no_grad():
-            for index in range(0, self.num_pairs):
-                # test
-                # if index < self.test_index:
-                #     continue
-
+            for index in range(0, self.num_pairs):  # 顺序检索
                 # get data
                 self.load_datapath_change_gt(index)
                 image1 = self.openImage(self.image_paths[0])
                 image2 = self.openImage(self.image_paths[1])
-                # label1 = self.openImage(self.label_paths[0])
-                # label2 = self.openImage(self.label_paths[1])
                 tensor1 = self.to_tensor(image1)[:3, :, :]
                 tensor2 = self.to_tensor(image2)[:3, :, :]
 
-                # prediction
+                # predict the segmentation result based on current load model
                 prediction1 = self.predict(tensor1)
                 prediction2 = self.predict(tensor2)
                 # print('set(prediction1)', np.unique(prediction1))
@@ -602,38 +603,45 @@ class ChangeDetection:
                 for n_seg in self.n_segments:
                     for merge_region in self.merge_regions:
                         # get fused superpixels from images
-                        _, sp_fused, sp1, sp2 = \
-                            self.SP_fusion(image1, image2, n_seg, self.compactness,
+                        sp_fused, sp1, sp2 = \
+                            self.SP_fusion(image1, image2, n_seg, self.compactness,  # 超像素融合
                                            self.merge, merge_regions=merge_region)
 
-                        # record super pixel accuracy
-                        if self.record_spAcc:
+                        if self.record_spAcc:  # record super pixel accuracy
                             self.record_acc(sp_fused, sp1, sp2, prediction1, prediction2, n_seg, merge_region)
 
-                        # change the prediction
-                        self.prediction_SP1 = self.classOfSP(sp_fused, prediction1)
-                        self.prediction_SP2 = self.classOfSP(sp_fused, prediction2)
-
-                        # the change based on fused SP class
-                        self.change_fusedSP = self.change_detect(self.prediction_SP1, self.prediction_SP2, sp_fused)
-
-                        # the change based on prediction
+                        # 根据分割结果的变化
                         self.change_seg = np.zeros(sp_fused.shape)
                         self.change_seg[prediction1 != prediction2] = 1
                         self.change_seg[prediction1 == 0] = 0  # 缺省类别忽略
                         self.change_seg[prediction2 == 0] = 0
 
-                        # the change based on fused SP filter pred change
+                        # 超像素整形后的变化
+                        # change the prediction based on SP reult
+                        self.prediction_SP1 = self.classOfSP(sp_fused, prediction1)
+                        self.prediction_SP2 = self.classOfSP(sp_fused, prediction2)
+                        self.change_fusedSP = self.change_detect(self.prediction_SP1, self.prediction_SP2, sp_fused)
+
+                        # 根据超像素融合的结果修改分割变化的变化
                         self.change_pred_change = self.change_detect_pred_change(sp_fused, self.change_seg, prediction1)
 
                         self.save_results(prediction1, prediction2)
-                        self.cal_metrics(change_pred_change=self.change_pred_change)
+                        # self.cal_metrics(change_pred_change=self.change_pred_change)
+                        # self.cal_metrics(change_pred_change=self.change_seg)
+                        # self.cal_metrics(change_pred_change=self.change_fusedSP)
 
         # get metrics together
-        recall_avg = sum(self.Recall) / len(self.Recall)
-        prec_avg = sum(self.precision) / len(self.precision)
-        pixAxx_avg = sum(self.pixAcc) / len(self.pixAcc)
-        return recall_avg, prec_avg, pixAxx_avg
+        def average(val1, val2, val3):
+            return [sum(val1) / len(val1), sum(val2) / len(val2), sum(val3) / len(val3)]
+
+        recall_avg_seg_SP, prec_avg_seg_SP, pixAcc_avg_seg_SP = average(self.Recall_seg_SP, self.precision_seg_SP,
+                                                                        self.pixAcc_seg_SP)
+        recall_avg_seg, prec_avg_seg, pixAcc_avg_seg = average(self.Recall_seg, self.precision_seg, self.pixAcc_seg)
+        recall_avg_SP, prec_avg_SP, pixAcc_avg_SP = average(self.Recall_SP, self.precision_SP, self.pixAcc_SP)
+
+        return [recall_avg_seg_SP, recall_avg_seg, recall_avg_SP], \
+               [prec_avg_seg_SP, prec_avg_seg, prec_avg_SP], \
+               [pixAcc_avg_seg_SP, pixAcc_avg_seg_SP, pixAcc_avg_SP]
 
     def predict(self, tensor):
         inputs = self.normalize(tensor).unsqueeze(0)
@@ -642,7 +650,7 @@ class ChangeDetection:
 
         return prediction
 
-    def cal_metrics(self, change_pred_change):
+    def cal_metrics(self, change_pred_change, tag):
         # metric
         changes = change_pred_change[self.change_gt != 0]
         if len(changes) == 0:
@@ -659,9 +667,18 @@ class ChangeDetection:
         correct = change_pred_change == self.change_gt
         pixelAcc = sum(sum(correct)) / correct.size
 
-        self.pixAcc.append(pixelAcc)
-        self.Recall.append(recall)
-        self.precision.append(precision)
+        if 'pred' in tag:
+            self.pixAcc_seg_SP.append(pixelAcc)
+            self.Recall_seg_SP.append(recall)
+            self.precision_seg_SP.append(precision)
+        elif 'seg' in tag:
+            self.pixAcc_seg.append(pixelAcc)
+            self.Recall_seg.append(recall)
+            self.precision_seg.append(precision)
+        elif 'fused' in tag:
+            self.pixAcc_SP.append(pixelAcc)
+            self.Recall_SP.append(recall)
+            self.precision_SP.append(precision)
 
         print('image {}, Recall: {}, precision: {}, f1score: {}, pixelAcc: {}'.format(
             self.image_paths[0], recall, precision, f1_score, pixelAcc))
@@ -676,24 +693,23 @@ class ChangeDetection:
         self.save_images(prediction2, self.out_path_tmp, self.image_paths[1], 'pred')
         self.save_images(self.prediction_SP2, self.out_path_tmp, self.image_paths[1], 'pred_afterSP')
         self.save_images(self.change_fusedSP, self.out_path_tmp, self.image_paths[0], 'change_SP')
-        self.save_images(self.change_gt, self.out_path_tmp, self.image_paths[0], 'change_gt')
+        # self.save_images(self.change_gt, self.out_path_tmp, self.image_paths[0], 'change_gt')
         self.save_images(self.change_seg, self.out_path_tmp, self.image_paths[0], 'change_seg')
         self.save_images(self.change_pred_change, self.out_path_tmp, self.image_paths[0], 'change_pred_SP')
         print('Success and save result to ', self.out_path_tmp)
 
-    @staticmethod
-    def change_detect(prediction_SP1, prediction_SP2, fused_sp, ignore_pixels=20):
+    def change_detect(self, prediction_SP1, prediction_SP2, fused_sp):
         """
         :param fused_sp: the fused super pixel
         :param prediction_SP1: semantic prediction based on 1st image
         :param prediction_SP2: semantic prediction based on 2st image
-        :param ignore_pixels: super pixels contain more pixel than this one will be considered
+        self.ignore_pixels: super pixels contain more pixel than this one will be considered
         :return: change based on fused_superpixel prediction
         """
         outset = np.unique(fused_sp.flatten())  # the unique labels
         change_pred = np.zeros(fused_sp.shape)
         for i in outset:
-            if len(prediction_SP1[fused_sp == i]) > ignore_pixels:
+            if len(prediction_SP1[fused_sp == i]) > self.ignore_pixels:
                 if prediction_SP1[fused_sp == i][0] != prediction_SP2[fused_sp == i][0] and \
                         prediction_SP2[fused_sp == i][0] != 0 and prediction_SP1[fused_sp == i][0] != 0:
                     change_pred[fused_sp == i] = 1
@@ -808,7 +824,6 @@ class ChangeDetection:
 
             labels1, labels2 = result
 
-        fusion_labels_before = labels1 + labels2
         fusion_labels_after = labels1 + labels2 * 100
 
         # test
@@ -831,7 +846,7 @@ class ChangeDetection:
         # io.imshow(out_f)
         # plt.show()
 
-        return fusion_labels_before, fusion_labels_after, labels1, labels2
+        return fusion_labels_after, labels1, labels2
 
     @staticmethod
     def classOfSP(sp, prediction):
@@ -849,9 +864,9 @@ class ChangeDetection:
         return fuse_prediction
 
     @staticmethod
-    def label2intarray(label, mode='palatte'):
+    def RGB2Index(label, mode='palatte'):
         """
-        :param label: the ndarray needs to be transfer into int-element-array
+        :param label: the ndarray with RGB value needs to be transfer into array with index value
         :param mode: whether turn based on palatte or only find Non-zeros
         :return: the numpy int labels
         """
@@ -880,10 +895,10 @@ class ChangeDetection:
         """
         :param sp:
         :param label:
-        :return: the accuracy of superpixel segmentation
+        :return: the accuracy of superpixel based on the label
         """
         if len(label.shape) == 3:
-            label = self.label2intarray(label)
+            label = self.RGB2Index(label)
         sp_pred = self.classOfSP(sp, label)
         correct = sp_pred[sp_pred == label]
         acc = len(correct) / sp_pred.size
@@ -892,6 +907,10 @@ class ChangeDetection:
 
     def record_acc(self, sp_fused, sp1, sp2, prediction1,
                    prediction2, n_seg, merge_region, label1=None, label2=None):
+        """
+        calculate SP accuracy and record it into ./result.txt
+        :return: the saved txt file in the current directory
+        """
         # sp accuracy based on label
         # label1_fuse_acc = self.sp_accuracy(sp_fused, label1)
         # label1_nofuse_acc = self.sp_accuracy(sp1, label1)
@@ -902,7 +921,7 @@ class ChangeDetection:
         pred2_fuse_acc = self.sp_accuracy(sp_fused, prediction2)
         pred2_nofuse_acc = self.sp_accuracy(sp2, prediction2)
 
-        save_path = './result.txt'
+        save_path = self.config["Output"]["SP_outpath"]
         with open(save_path, 'a') as f:
             f.write('########################################\n')
             f.write('Experiment:{}\n'.format(self.exp))
@@ -921,8 +940,15 @@ class ChangeDetection:
 
 
 if __name__ == '__main__':
-    detector = ChangeDetection()
+    parser = argparse.ArgumentParser(description='Change Detection arguments')
+    parser.add_argument('-c', '--config', default='config.json', type=str,
+                        help='the path to the config file')
+    args = parser.parse_args()
+    config = json.load(open(args.config))
+
+    detector = ChangeDetection(config)
     recall, precision, pixAcc = detector.detect()
     f1score = 2 * ((precision * recall) / (precision + recall))
 
-    print('recall: {} \n precision: {}, \n f1score:{}, \n pixelAcc:{}'.format(recall, precision, f1score, pixAcc))
+    print('change detection: seg_SP,seg,SP')
+    print('recall: {} \n precision: {}, \n pixelAcc:{}'.format(recall[0], precision[0], pixAcc[0]))
