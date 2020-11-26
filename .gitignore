@@ -1,21 +1,17 @@
 /.idea
 /label/
 /MergeTool
-/origin_img/
 /outputs/
-/xionganData/
 /note.txt
-/best_model.pth
-/best_model_olddata.pth
 /tmp.txt
-
-/best_model_pspnet_3.pth
-/checkpoint-epoch132.pth
-/shijiazhuangData/
 co-seg.py
 Merge.tif
 MGslic.py
 Superpixel.tif
 test MG.py
 tmp.txt
-transform_weishen.pys
+transform_weishen.py
+Data/
+OriginData/
+pretrained/
+result.txt

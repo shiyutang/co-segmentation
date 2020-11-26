@@ -1,8 +1,8 @@
 {
   "Exp": {
-    "name": "shijiazhuang_thresh_0.5_nseg_1500_0907",
+    "name": "shijiazhuang_thresh_0.85_nseg_2000_1125_checkpoint-epoch230_ig50",
     "use_gpu": true,
-    "checkpoint": "./best_model.pth",
+    "checkpoint": "./pretrained/checkpoint-epoch230.pth",
     "classes": 8,
     "palette": [0, 0, 0,
                 150, 250, 0,
@@ -14,20 +14,19 @@
                 0, 150, 250]
   },
   "Data": {
-    "path": "./origin_img/shijiazhuang"
+    "path": "./Data/shijiazhuang"
   },
   "Output": {
-    "record_SP_Acc": true,
-    "img_outpath": "./outputs/shijiazhuang_thresh_0.5_nseg_1500_0907",
-    "SP_outpath": "./result.txt"
+    "record_SP_Acc": false,
+    "img_outpath": "./outputs/shijiazhuang_thresh_0.85_nseg_2000_1125_checkpoint-epoch230_ig50"
   },
   "SP_setting": {
     "if_merge": false,
-    "n_segments": [1500],
+    "n_segments": [2000],
     "compactness": 10,
     "merge_regions": [0],
-    "threshold": 0.5,
-    "ignore_pixels": 20
+    "threshold": 0.85,
+    "ignore_pixels": 50
   },
   "Transform": {
     "scales": [0.75, 1.0, 1.25, 1.5, 1.75, 2.0],

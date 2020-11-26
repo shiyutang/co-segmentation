@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as function
 from PIL import Image
 from scipy import ndimage
 from tifffile import tifffile
@@ -296,7 +296,7 @@ class BaseModel(nn.Module):
     def summary(self):
         model_parameters = filter(lambda p: p.requires_grad, self.parameters())
         nbr_params = sum([np.prod(p.size()) for p in model_parameters])
-        self.logger.info('Nbr of trainable parameters: {nbr_params}'.format(nbr_params))
+        self.logger.info('Nbr of trainable parameters: {}'.format(nbr_params))
 
     def __str__(self):
         model_parameters = filter(lambda p: p.requires_grad, self.parameters())
@@ -360,8 +360,8 @@ class _PSPModule(nn.Module):
     def forward(self, features):
         h, w = features.size()[2], features.size()[3]
         pyramids = [features]
-        pyramids.extend([F.interpolate(stage(features), size=(h, w), mode='bilinear',
-                                       align_corners=True) for stage in self.stages])
+        pyramids.extend([function.interpolate(stage(features), size=(h, w), mode='bilinear',
+                                              align_corners=True) for stage in self.stages])
         output = self.bottleneck(torch.cat(pyramids, dim=1))
         return output
 
@@ -439,12 +439,12 @@ class PSPNet(BaseModel):
         x = self.layer4(x_aux)
 
         output = self.master_branch(x)
-        output = F.interpolate(output, size=input_size, mode='bilinear', align_corners=False)
+        output = function.interpolate(output, size=input_size, mode='bilinear', align_corners=False)
         output = output[:, :, :input_size[0], :input_size[1]]
 
         if self.training and self.use_aux:
             aux = self.auxiliary_branch(x_aux)
-            aux = F.interpolate(aux, size=input_size, mode='bilinear', align_corners=False)
+            aux = function.interpolate(aux, size=input_size, mode='bilinear', align_corners=False)
             aux = aux[:, :, :input_size[0], :input_size[1]]
             return output, aux
         return output
@@ -474,63 +474,53 @@ def colorize_mask(mask, palette):
 
 # noinspection PyPep8Naming,PyAttributeOutsideInit
 class ChangeDetection:
-    def __init__(self, config):
+    def __init__(self, cfg):
         ################
         # EXP Settings #
         ################
-        self.exp = config["Exp"]["name"]
-        self.config = config
-        self.record_spAcc = config['Output']["record_SP_Acc"]  # save superpixel accuracy to a txt file
+        self.exp = cfg["Exp"]["name"]
+        self.config = cfg
+        self.record_spAcc = cfg['Output']["record_SP_Acc"]  # save superpixel accuracy to a txt file
         # SP merge params
-        self.n_segments = config["SP_setting"]["n_segments"]
-        self.compactness = config["SP_setting"]["compactness"]
-        self.merge_regions = config["SP_setting"]["merge_regions"]
-        self.merge = config["SP_setting"]["if_merge"]
+        self.n_segments = cfg["SP_setting"]["n_segments"]
+        self.compactness = cfg["SP_setting"]["compactness"]
+        self.merge_regions = cfg["SP_setting"]["merge_regions"]
+        self.merge = cfg["SP_setting"]["if_merge"]
         if self.merge:
             self.n_segments, self.merge_regions = [1000, 1500, 2000, 3000], [100, 150, 200]
         # SP 整形参数
-        self.threshold = config["SP_setting"]["threshold"]
-        self.ignore_pixels = config["SP_setting"]["ignore_pixels"]
+        self.threshold = cfg["SP_setting"]["threshold"]
+        self.ignore_pixels = cfg["SP_setting"]["ignore_pixels"]
 
         # Device
-        self.use_gpu = config["Exp"]["use_gpu"]
+        self.use_gpu = cfg["Exp"]["use_gpu"]
         if torch.cuda.is_available() and self.use_gpu:
             self.device = torch.device('cuda:0')
         else:
             self.device = torch.device('cpu')
 
         # output Data
-        self.out_path = config['Output']["img_outpath"]
+        self.out_path = cfg['Output']["img_outpath"]
         if not os.path.exists(self.out_path):
             os.makedirs(self.out_path)
 
         # input data
-        self.datapath = config["Data"]["path"]
-        if 'chengdu' in self.datapath:
-            img_ext, lbl_ext = 'jpg', 'png'
-            self.image_files = sorted(
-                glob(os.path.join(self.datapath, '*.{}'.format(img_ext))))
-            self.label_files = sorted(glob(os.path.join('./label/chengdu', '*.{}'.format(lbl_ext))))
-            self.num_pairs = len(self.image_files) // 2
-        elif 'xiongan' in self.datapath:
-            self.num_pairs = len(glob(os.path.join(self.datapath, '*')))
-            self.image_dirs = sorted(glob(os.path.join(self.datapath, '*')))
-        else:
-            self.num_pairs = len(glob(os.path.join(self.datapath, '*')))
-            self.image_dirs = sorted(glob(os.path.join(self.datapath, '*')))
+        self.datapath = cfg["Data"]["path"]
+        self.num_pairs = len(glob(os.path.join(self.datapath, '*')))
+        self.pairs_dir = sorted(glob(os.path.join(self.datapath, '*')))
 
         # Transform
-        self.scales = config["Transform"]["scales"]
+        self.scales = cfg["Transform"]["scales"]
         self.to_tensor = transforms.ToTensor()
-        self.normalize = transforms.Normalize(config["Transform"]["normalizeX"],
-                                              config["Transform"]["normalizeY"])
-        self.num_classes = config["Exp"]["classes"]
-        self.palette = config["Exp"]["palette"]
+        self.normalize = transforms.Normalize(cfg["Transform"]["normalizeX"],
+                                              cfg["Transform"]["normalizeY"])
+        self.num_classes = cfg["Exp"]["classes"]
+        self.palette = cfg["Exp"]["palette"]
 
         # Model
         self.model = PSPNet()
 
-        checkpoint = torch.load(config["Exp"]["checkpoint"], map_location=self.device)
+        checkpoint = torch.load(cfg["Exp"]["checkpoint"], map_location=self.device)
         if isinstance(checkpoint, dict) and 'state_dict' in checkpoint.keys():
             checkpoint = checkpoint['state_dict']
         if 'module' in list(checkpoint.keys())[0] and not isinstance(self.model, torch.nn.DataParallel):
@@ -541,40 +531,38 @@ class ChangeDetection:
         self.model.eval()
 
         # result
-        self.Recall_seg_SP, self.precision_seg_SP, self.pixAcc_seg_SP = [], [], []
-        self.Recall_seg, self.precision_seg, self.pixAcc_seg = [], [], []
-        self.Recall_SP, self.precision_SP, self.pixAcc_SP = [], [], []
+        self.omit_seg_SP, self.falseAlarm_seg_SP, self.pixAcc_seg_SP, self.f1_score_seg_SP = [], [], [], []
+        self.omit_seg, self.falseAlarm_seg, self.pixAcc_seg, self.f1_score_seg = [], [], [], []
+        self.omit_SP, self.falseAlarm_SP, self.pixAcc_SP, self.f1_score_SP = [], [], [], []
 
     def load_datapath_change_gt(self, index):
-        # load data: change_gt
-        # for each pic in image_files, it will generate classes for each superpixel
-        if 'chengdu' in self.datapath:
-            self.image_paths = self.image_files[2 * index:2 * index + 2]
-            # the change based on labels
-            label1 = np.array(Image.open(self.label_files[2 * index]).convert('RGB'))
-            label2 = np.array(Image.open(self.label_files[2 * index + 1]).convert('RGB'))
+        """
+        desc: 根据数据格式，载入数据。成都标签为 png 格式，其他为 tif 格式，
+        index: 索引位置
+
+        """
+        self.image_paths = sorted(glob(os.path.join(self.pairs_dir[index], '*.jpg')))
+        if 'chengdu' in self.datapath or 'shijiazhuang' in self.datapath:
+            # 变化需要根据标签推断， 标签为 png
+            label1_path, label2_path = sorted(glob(os.path.join(self.pairs_dir[index], '*.png')))
+            label1 = np.array(Image.open(label1_path).convert('RGB'))
+            label2 = np.array(Image.open(label2_path).convert('RGB'))
             label1, label2 = self.RGB2Index(label1), self.RGB2Index(label2)
             change_gt = np.zeros(label1.shape)
             change_gt[label1 != label2] = 1
-            change_gt[label1 == 0] = 0
+            change_gt[label1 == 0] = 0  # ignore background
             change_gt[label2 == 0] = 0
             self.change_gt = change_gt
 
         elif 'xiongan' in self.datapath:
-            self.image_paths = sorted(glob(os.path.join(self.image_dirs[index], '*.jpg')))
-            self.label_paths = sorted(glob(os.path.join(self.image_dirs[index], '*.png')))
-
-            # the change based on labels
-            mask_path = glob(os.path.join(self.image_dirs[index], 'mask/*.tif'))[0]  # 只取第一张
+            # 变化直接有标注的真值
+            mask_path = glob(os.path.join(self.pairs_dir[index], 'mask/*.tif'))[0]  # 只取第一张
             change_gt = tifffile.imread(mask_path)
-            change_gt = self.RGB2Index(change_gt, mode='NonZero')
+            change_gt = self.RGB2Index(change_gt, mode='NonZero')  # 把三位的 RGB， 根据 palatte 转换为 index
             self.change_gt = change_gt
 
-        elif 'shijiazhuang' in self.datapath:
-            self.image_paths = sorted(glob(os.path.join(self.image_dirs[index], '*.jpg')))
-            # shijiazhuang 没有变化真值，因此不能记录metric 和 输出真值图像
-
-    def openImage(self, img_path):
+    @staticmethod
+    def openImage(img_path):
         if "jpg" in img_path or "png" in img_path:
             image = Image.open(img_path).convert('RGB')  # return Image object
         elif "tiff" in img_path or "tif" in img_path:
@@ -586,6 +574,11 @@ class ChangeDetection:
 
     def detect(self):
         # testing
+        save_path = self.config["Output"]["img_outpath"] + '/omit number.txt'
+        with open(save_path, 'a') as f:
+            f.write('########################################\n')
+            f.write('Experiment:{}\n'.format(self.exp))
+
         with torch.no_grad():
             for index in range(0, self.num_pairs):  # 顺序检索
                 # get data
@@ -626,62 +619,79 @@ class ChangeDetection:
                         self.change_pred_change = self.change_detect_pred_change(sp_fused, self.change_seg, prediction1)
 
                         self.save_results(prediction1, prediction2)
-                        # self.cal_metrics(change_pred_change=self.change_pred_change)
-                        # self.cal_metrics(change_pred_change=self.change_seg)
-                        # self.cal_metrics(change_pred_change=self.change_fusedSP)
+
+                        self.cal_metrics(change_pred_change=self.change_pred_change, tag='pred')
+                        self.cal_metrics(change_pred_change=self.change_seg, tag='seg')
+                        self.cal_metrics(change_pred_change=self.change_fusedSP, tag='fused')
 
         # get metrics together
-        def average(val1, val2, val3):
-            return [sum(val1) / len(val1), sum(val2) / len(val2), sum(val3) / len(val3)]
+        def average(val1, val2, val3, val4):
+            return [sum(val1) / len(val1), sum(val2) / len(val2), sum(val3) / len(val3), sum(val4) / len(val4)]
 
-        recall_avg_seg_SP, prec_avg_seg_SP, pixAcc_avg_seg_SP = average(self.Recall_seg_SP, self.precision_seg_SP,
-                                                                        self.pixAcc_seg_SP)
-        recall_avg_seg, prec_avg_seg, pixAcc_avg_seg = average(self.Recall_seg, self.precision_seg, self.pixAcc_seg)
-        recall_avg_SP, prec_avg_SP, pixAcc_avg_SP = average(self.Recall_SP, self.precision_SP, self.pixAcc_SP)
+        omit_avg_seg_SP, prec_avg_seg_SP, pixAcc_avg_seg_SP, f1_score_seg_SP = average(self.omit_seg_SP,
+                                                                                       self.falseAlarm_seg_SP,
+                                                                                       self.pixAcc_seg_SP,
+                                                                                       self.f1_score_seg_SP)
+        omit_avg_seg, prec_avg_seg, pixAcc_avg_seg, f1_score_seg = average(self.omit_seg, self.falseAlarm_seg,
+                                                                           self.pixAcc_seg, self.f1_score_seg)
+        omit_avg_SP, prec_avg_SP, pixAcc_avg_SP, f1_score_SP = average(self.omit_SP, self.falseAlarm_SP,
+                                                                       self.pixAcc_SP, self.f1_score_SP)
 
-        return [recall_avg_seg_SP, recall_avg_seg, recall_avg_SP], \
+        return [omit_avg_seg_SP, omit_avg_seg, omit_avg_SP], \
                [prec_avg_seg_SP, prec_avg_seg, prec_avg_SP], \
-               [pixAcc_avg_seg_SP, pixAcc_avg_seg_SP, pixAcc_avg_SP]
+               [pixAcc_avg_seg_SP, pixAcc_avg_seg_SP, pixAcc_avg_SP], \
+               [f1_score_seg_SP, f1_score_seg, f1_score_SP]
 
     def predict(self, tensor):
         inputs = self.normalize(tensor).unsqueeze(0)
         prediction = self.multi_scale_predict(inputs)
-        prediction = F.softmax(torch.from_numpy(prediction), dim=0).argmax(0).cpu().numpy()
+        prediction = function.softmax(torch.from_numpy(prediction), dim=0).argmax(0).cpu().numpy()
 
         return prediction
 
     def cal_metrics(self, change_pred_change, tag):
         # metric
         changes = change_pred_change[self.change_gt != 0]
+        nochange = change_pred_change[self.change_gt == 0]
         if len(changes) == 0:
             print('***************************')
             print('The incorrect data path is ', self.image_paths[0])
             return
-        recall = sum(changes) / len(changes)
-        precision = sum(changes) / sum(change_pred_change[change_pred_change == 1])
-        if recall > 0 and precision > 0:
-            f1_score = 2 * ((precision * recall) / (precision + recall))
-        else:
-            f1_score = 0
 
         correct = change_pred_change == self.change_gt
         pixelAcc = sum(sum(correct)) / correct.size
 
+        omit = (len(changes) - sum(changes)) / correct.size
+        falseAlarm = sum(nochange) / correct.size
+
+        if omit > 0 and falseAlarm > 0:
+            f1_score = 2 * ((falseAlarm * omit) / (falseAlarm + omit))
+        else:
+            f1_score = 0
+
         if 'pred' in tag:
             self.pixAcc_seg_SP.append(pixelAcc)
-            self.Recall_seg_SP.append(recall)
-            self.precision_seg_SP.append(precision)
+            self.omit_seg_SP.append(omit)
+            self.falseAlarm_seg_SP.append(falseAlarm)
+            self.f1_score_seg_SP.append(f1_score)
         elif 'seg' in tag:
             self.pixAcc_seg.append(pixelAcc)
-            self.Recall_seg.append(recall)
-            self.precision_seg.append(precision)
+            self.omit_seg.append(omit)
+            self.falseAlarm_seg.append(falseAlarm)
+            self.f1_score_seg.append(f1_score)
         elif 'fused' in tag:
             self.pixAcc_SP.append(pixelAcc)
-            self.Recall_SP.append(recall)
-            self.precision_SP.append(precision)
+            self.omit_SP.append(omit)
+            self.falseAlarm_SP.append(falseAlarm)
+            self.f1_score_SP.append(f1_score)
 
-        print('image {}, Recall: {}, precision: {}, f1score: {}, pixelAcc: {}'.format(
-            self.image_paths[0], recall, precision, f1_score, pixelAcc))
+        save_path = self.config["Output"]["img_outpath"] + '/omit number.txt'
+        with open(save_path, 'a') as f:
+            f.write('omit: {}, falseAlarm: {}, f1score: {}, pixelAcc: {} \n'.format(
+                omit, falseAlarm, f1_score, pixelAcc))
+
+        print('omit: {}, falseAlarm: {}, f1score: {}, pixelAcc: {}'.format(
+            omit, falseAlarm, f1_score, pixelAcc))
 
     def save_results(self, prediction1, prediction2):
         # save prediction result on images
@@ -693,9 +703,12 @@ class ChangeDetection:
         self.save_images(prediction2, self.out_path_tmp, self.image_paths[1], 'pred')
         self.save_images(self.prediction_SP2, self.out_path_tmp, self.image_paths[1], 'pred_afterSP')
         self.save_images(self.change_fusedSP, self.out_path_tmp, self.image_paths[0], 'change_SP')
-        # self.save_images(self.change_gt, self.out_path_tmp, self.image_paths[0], 'change_gt')
+        self.save_images(self.change_gt, self.out_path_tmp, self.image_paths[0], 'change_gt')
         self.save_images(self.change_seg, self.out_path_tmp, self.image_paths[0], 'change_seg')
         self.save_images(self.change_pred_change, self.out_path_tmp, self.image_paths[0], 'change_pred_SP')
+        save_path = self.config["Output"]["img_outpath"] + '/omit number.txt'
+        with open(save_path, 'a') as f:
+            f.write('Success and save result to '+ self.out_path_tmp+'\n')
         print('Success and save result to ', self.out_path_tmp)
 
     def change_detect(self, prediction_SP1, prediction_SP2, fused_sp):
@@ -921,7 +934,7 @@ class ChangeDetection:
         pred2_fuse_acc = self.sp_accuracy(sp_fused, prediction2)
         pred2_nofuse_acc = self.sp_accuracy(sp2, prediction2)
 
-        save_path = self.config["Output"]["SP_outpath"]
+        save_path = self.config["Output"]["img_outpath"] + '/result.txt'
         with open(save_path, 'a') as f:
             f.write('########################################\n')
             f.write('Experiment:{}\n'.format(self.exp))
@@ -947,8 +960,21 @@ if __name__ == '__main__':
     config = json.load(open(args.config))
 
     detector = ChangeDetection(config)
-    recall, precision, pixAcc = detector.detect()
-    f1score = 2 * ((precision * recall) / (precision + recall))
+    omit, falseAlarm, pixAcc, f1_score = detector.detect()
 
-    print('change detection: seg_SP,seg,SP')
-    print('recall: {} \n precision: {}, \n pixelAcc:{}'.format(recall[0], precision[0], pixAcc[0]))
+    save_path = config["Output"]["img_outpath"] + '/omit number.txt'
+    with open(save_path, 'a') as f:
+        f.write('change detection: seg_SP, seg, SP')
+        f.write('omit: {} \n falseAlarm: {}, \n pixelAcc:{}, \n f1_score:{}'.format(omit[0], falseAlarm[0], pixAcc[0],
+                                                                                    f1_score[0]))
+        f.write('omit: {} \n falseAlarm: {}, \n pixelAcc:{}, \n f1_score:{}'.format(omit[1], falseAlarm[1], pixAcc[1],
+                                                                                    f1_score[1]))
+        f.write('omit: {} \n falseAlarm: {}, \n pixelAcc:{}, \n f1_score:{}'.format(omit[2], falseAlarm[2], pixAcc[2],
+                                                                              f1_score[2]))
+    print('change detection: seg_SP, seg, SP')
+    print('omit: {} \n falseAlarm: {}, \n pixelAcc:{}, \n f1_score:{}'.format(omit[0], falseAlarm[0], pixAcc[0],
+                                                                              f1_score[0]))
+    print('omit: {} \n falseAlarm: {}, \n pixelAcc:{}, \n f1_score:{}'.format(omit[1], falseAlarm[1], pixAcc[1],
+                                                                              f1_score[1]))
+    print('omit: {} \n falseAlarm: {}, \n pixelAcc:{}, \n f1_score:{}'.format(omit[2], falseAlarm[2], pixAcc[2],
+                                                                              f1_score[2]))

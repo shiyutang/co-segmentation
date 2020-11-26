@@ -10,6 +10,7 @@ import numpy as np
 import os
 
 palette_save = [0, 0, 0,
+                0, 0, 0,
                 150, 250, 0,
                 0, 250, 0,
                 0, 100, 0,
@@ -85,11 +86,14 @@ def label2intarray(label, trans_palette):
 
 
 def colorize_mask(mask, palette):
+    """
+    mask should only have 2 channels to get the right result
+    """
     zero_pad = 256 * 3 - len(palette)
     for i in range(zero_pad):
         palette.append(0)
     new_mask = Image.fromarray(mask.astype(np.uint8)).convert('P')
-    new_mask.putpalette(palette)
+    new_mask.putpalette(palette)  # palette 中每三个代表像素值为1，2，3...
     return new_mask
 
 
@@ -103,45 +107,59 @@ def save_images(mask, output_path=None, image_file=None, tag=None, savePath=None
     colorized_mask.save(savePath)
 
 
-read_path = Path(r'D:\Shiyu\School\change detection\co-segmentation\origin_img\shijiazhuang')
-dir_list = [read_path.joinpath(f) for f in read_path.glob('*')]
-print('dir_list', dir_list)
+def cutsave(name, im, imgtag=False):
+    save_name = 'Hid{}_Wid{}_'.format(i, j) + name
+    if not imgtag:
+        crop = im[i * height:(i + 1) * height, j * width:(j + 1) * width, :1]
+        crop = np.squeeze(crop, axis=2)
+        crop = colorize_mask(crop, palette_save)
+    else:
+        crop = im[i * height:(i + 1) * height, j * width:(j + 1) * width]
+        crop = Image.fromarray(crop)
+    crop.save(os.path.join(sp, save_name))
+    print('save to', os.path.join(sp, save_name))
 
+
+read_path = Path(r'E:\School\change detection\co-segmentation\OriginData\shijiazhuang')
+save_path = Path(r'E:\School\change detection\co-segmentation\Data\shijiazhuang')
 height, width = 800, 800
 
-for cat_dir in dir_list:
-    # save directory
-    savedir = cat_dir.joinpath('segimg')
-    if not savedir.exists():
-        savedir.mkdir()
+order_first = ['GF2_PMS1_E114.6_N38.0_20170906_L1A0002588959-MSS1_1',
+               'GF2_PMS1_E114.6_N38.0_20170906_L1A0002588959-MSS1_2',
+               'GF2_PMS1_E114.6_N38.0_20170906_L1A0002588959-MSS1_3',
+               'GF2_PMS1_E114.6_N38.0_20180416_L1A0003126155-MSS1_1',
+               'GF2_PMS1_E114.6_N38.0_20180416_L1A0003126155-MSS1_2']
 
+order_second = ['GF2_PMS2_E114.7_N37.9_20151002_L1A0001074088-MSS1_1',
+                'GF2_PMS2_E114.7_N37.9_20151002_L1A0001074088-MSS1_2',
+                'GF2_PMS2_E114.7_N37.9_20151002_L1A0001074088-MSS1_3',
+                'GF2_PMS2_E114.7_N37.9_20151002_L1A0001074088-MSS1_4',
+                'GF2_PMS2_E114.7_N37.9_20151002_L1A0001074088-MSS1_5']
+
+from tifffile import tifffile
+
+cnt = 1
+for index in range(len(order_second)):
     # cut and save
-    for image_name in cat_dir.glob('*.png'):
-        print('image_name', image_name)
-        im = Image.open(image_name)
-        im = np.array(im)
-        im_height, im_width, channel = im.shape
-        im_name = str(image_name).split('\\')[-1]
-        if 'label' in str(image_name):
-            save_ext = '.png'
-        else:
-            save_ext = '.jpg'
+    img1_path = os.path.join(read_path, 'first\\images\\' + order_first[index] + '.png')
+    img2_path = os.path.join(read_path, 'second\\images\\' + order_second[index] + '.png')
+    img1, img2 = np.array(Image.open(img1_path)), np.array(Image.open(img2_path))
+    print('image_name', img1_path, img2_path, img1.shape)
+    im_height, im_width, channel = img1.shape
 
-        for i in range(im_height // height):
-            for j in range(im_width // width):
-                save_name = 'Hid{}_Wid{}_'.format(i, j) + im_name[:-4] + save_ext
-                print('start save {}'.format(save_name))
-                crop = im[i * height:(i + 1) * height, j * width:(j + 1) * width, :]
-                crop_im = Image.fromarray(crop)
-                crop_im.save(os.path.join(savedir, save_name))
+    lbl1_path = os.path.join(read_path, 'first\\labels_gray\\' + order_first[index] + '.png')
+    lbl2_path = os.path.join(read_path, 'second\\labels_gray\\' + order_second[index] + '.png')
+    lbl1, lbl2 = np.array(Image.open(lbl1_path)), np.array(Image.open(lbl2_path))
 
-    # # change label from RGB to index array
-    # labellist = [f for f in savedir.glob('*label*')]
-    # print('labellist', labellist)
-    # # test()
-    # # for i in range(len(labellist) // 2):
-    # #     change_gt(index=2 * i, save_dir=savedir)
-    # for labelname in labellist:
-    #     label = np.array(Image.open(labelname).convert('RGB'))
-    #     label = label2intarray(label, trans_palette=mappalette)
-    #     save_images(label, savePath=labelname)
+    for i in range(im_height // height):
+        for j in range(im_width // width):
+            # save directory
+            sp = save_path.joinpath('{}'.format(cnt))
+            if not sp.exists():
+                sp.mkdir()
+            cutsave(order_first[index] + '.jpg', img1, imgtag=True)
+            cutsave(order_second[index] + '.jpg', img2, imgtag=True)
+            cutsave(order_first[index] + '.png', lbl1)
+            cutsave(order_second[index] + '.png', lbl2)
+            cnt += 1
+    # break
