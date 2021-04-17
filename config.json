@@ -4,6 +4,7 @@
     "use_gpu": true,
     "checkpoint": "./pretrained/checkpoint-epoch230.pth",
     "classes": 8,
+    "arch": "resnet152",
     "palette": [0, 0, 0,
                 150, 250, 0,
                 0, 250, 0,
